@@ -1,6 +1,6 @@
 use std::fs;
 use std::net::TcpStream;
-use std::io::{Read, Write, BufRead, BufReader};
+use std::io::{Read, Write, BufRead, BufReader, self};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::Mutex;
@@ -8,6 +8,8 @@ use std::sync::Mutex;
 use native_tls::TlsConnector;
 
 use lazy_static::lazy_static;
+
+use flate2::read::GzDecoder;
 
 lazy_static! {
   static ref CACHE: Mutex<HashMap<String, CacheEntry>> = Mutex::new(HashMap::new());
@@ -165,7 +167,6 @@ impl URLHandler {
     (true, None)
   }
 
-
   fn request(&mut self) -> Result<String, Box<dyn std::error::Error>> {
     const REDIRECT_LIMIT: i32 = 10;
     let mut redirects = 0;
@@ -212,10 +213,10 @@ impl URLHandler {
       let mut stream = stream;
 
       let headers = vec![
-          ("Host", self.host.as_str()),
-          ("Connection", "keep-alive"),
-          ("User-Agent", "Project P"),
-          ("Accept-Encoding", "gzip"),
+        ("Host", self.host.as_str()),
+        ("Connection", "keep-alive"),
+        ("User-Agent", "Project P"),
+        ("Accept-Encoding", "gzip"),
       ];
 
       let mut request = format!("GET {} HTTP/1.1\r\n", self.path);
@@ -252,7 +253,10 @@ impl URLHandler {
 
       if status.starts_with("3") {
         if let Some(location) = response_headers.get("location") {
-          if let Some(content_length) = response_headers.get("content-length") {
+          
+          if response_headers.get("transfer-encoding").is_some() {
+            self.read_chunked(&mut reader)?;
+          } else if let Some(content_length) = response_headers.get("content-length") {
             let length: usize = content_length.parse()?;
             let mut buffer = vec![0u8; length];
             reader.read_exact(&mut buffer)?;
@@ -278,26 +282,30 @@ impl URLHandler {
           return Err(format!("Redirect without location header: {}", status).into());
         }
       }
-
-      let content = if let Some(content_length) = response_headers.get("content-length") {
-        let length: usize = content_length.parse()?;
+      
+      let mut raw_bytes = if response_headers.get("transfer-encoding").map(|v| v.as_str()) == Some("chunked") {
+        self.read_chunked(&mut reader)? 
+      } else if let Some(content_length) = response_headers.get("content-length") {
+        let length: usize = content_length.parse().map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Content-Length"))?;
         let mut buffer = vec![0u8; length];
         reader.read_exact(&mut buffer)?;
-        String::from_utf8(buffer)?
+        buffer
       } else {
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer)?;
-        String::from_utf8(buffer)?
+        buffer
       };
 
-      assert!(
-        !response_headers.contains_key("transfer-encoding"),
-        "transfer-encoding not supported"
-      );
-      assert!(
-        !response_headers.contains_key("content-encoding"),
-        "content-encoding not supported"
-      );
+      if response_headers.get("content-encoding").map(|v| v.as_str()) == Some("gzip") {
+        println!("[Decompressing] gzip content");
+        let mut decoder = GzDecoder::new(&raw_bytes[..]);
+        let mut decompressed_bytes = Vec::new();
+        decoder.read_to_end(&mut decompressed_bytes)?;
+        raw_bytes = decompressed_bytes;
+      }
+      
+      let content = String::from_utf8(raw_bytes)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8 sequence"))?;
 
       let (should_cache, max_age) = self.should_cache(&response_headers,status);
       if should_cache {
@@ -327,7 +335,41 @@ impl URLHandler {
       return Ok(content);
       }
   }
+  
+  fn read_chunked<R: BufRead>(&self ,reader: &mut R) -> io::Result<Vec<u8>> {
+    let mut chunks = Vec::new();
+  
+    loop {
+      let mut line = String::new();
+      reader.read_line(&mut line)?;
+          
+      let chunk_size = usize::from_str_radix(line.trim(), 16)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid chunk size hex"))?;
+  
+      if chunk_size == 0 {
+        loop {
+          let mut trailer_line = String::new();
+          reader.read_line(&mut trailer_line)?;
+          if trailer_line == "\r\n" || trailer_line.is_empty() {
+            break;
+          }
+        }
+        break;
+      }
+  
+      let mut chunk_data = vec![0u8; chunk_size];
+      reader.read_exact(&mut chunk_data)?;
+      chunks.extend(chunk_data);
+  
+      let mut footer = String::new();
+      reader.read_line(&mut footer)?;
+    }
+
+    Ok(chunks)
+  }
 }
+
+
 
 pub fn show(body: &str, view_source: bool) {
   if view_source {
