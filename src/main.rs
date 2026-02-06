@@ -1,23 +1,13 @@
-mod url_handler;
-use url_handler::{URLHandler, load};
-use std::env;
+mod app;
+mod net;
+mod rendering;
+mod ui;
+mod utils;
 
-fn main() {
-  let args: Vec<String> = env::args().collect();
-  let mut url = String::from("file:///home/username/Downloads/some.txt");
-  
-  match args.get(1) {
-    Some(value) => {
-      url = value.to_string();
-    }
-    _ => ()
-  }
-  
-  let mut handler = URLHandler::default();
-  handler.init(url, false);
-  
-  match load(handler) {
-    Ok(_) => {},
-    Err(e) => eprintln!("Error: {}", e),
-  }
+use app::Browser;
+
+fn main() -> iced::Result {
+  iced::application("Browser", Browser::update, Browser::view)
+    .subscription(Browser::subscription)
+    .run_with(Browser::new)
 }

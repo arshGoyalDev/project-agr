@@ -29,7 +29,7 @@ pub struct URLHandler {
   host: String,
   path: String,
   port: u16,
-  view_source: bool,
+  pub view_source: bool,
   mediatype: String,
   data: String,
 }
@@ -47,7 +47,7 @@ impl URLHandler {
       self.view_source = true;
         if let Some((scheme, rest)) = self.url.split_once(":") {
           self.scheme = scheme.to_string();
-           self.url = rest.to_string();
+          self.url = rest.to_string();
         }
     }
 
@@ -131,7 +131,7 @@ impl URLHandler {
       .get("cache-control")
       .map(|s| s.as_str())
       .unwrap_or("");
-
+    
     if cache_control.contains("no-store") {
       return (false, None);
     }
@@ -167,7 +167,7 @@ impl URLHandler {
     (true, None)
   }
 
-  fn request(&mut self) -> Result<String, Box<dyn std::error::Error>> {
+  pub fn request(&mut self) -> Result<String, Box<dyn std::error::Error>> {
     const REDIRECT_LIMIT: i32 = 10;
     let mut redirects = 0;
 
@@ -250,10 +250,11 @@ impl URLHandler {
           );
         }
       }
-
+      
       if status.starts_with("3") {
         if let Some(location) = response_headers.get("location") {
           
+          // clear the buffer before redirecting (good practice)
           if response_headers.get("transfer-encoding").is_some() {
             self.read_chunked(&mut reader)?;
           } else if let Some(content_length) = response_headers.get("content-length") {
@@ -369,44 +370,42 @@ impl URLHandler {
   }
 }
 
+// pub fn show(body: &str, view_source: bool) {
+//   if view_source {
+//     print!("{}", body);
+//   } else {
+//     let mut in_tag = false;
+//     let mut in_entity = false;
+//     let mut entity_value = String::new();
 
+//     let mut entities = HashMap::new();
+//     entities.insert("gt".to_string(), ">".to_string());
+//     entities.insert("lt".to_string(), "<".to_string());
 
-pub fn show(body: &str, view_source: bool) {
-  if view_source {
-    print!("{}", body);
-  } else {
-    let mut in_tag = false;
-    let mut in_entity = false;
-    let mut entity_value = String::new();
+//     for c in body.chars() {
+//       if c == '<' {
+//         in_tag = true;
+//       } else if c == '>' {
+//         in_tag = false;
+//       } else if c == '&' {
+//         in_entity = true;
+//       } else if c == ';' && in_entity {
+//         in_entity = false;
+//         if let Some(entity) = entities.get(&entity_value) {
+//           print!("{}", entity);
+//         }
+//         entity_value.clear();
+//       } else if in_entity {
+//         entity_value.push(c);
+//       } else if !in_tag {
+//         print!("{}", c);
+//       }
+//     }
+//   }
+// }
 
-    let mut entities = HashMap::new();
-    entities.insert("gt".to_string(), ">".to_string());
-    entities.insert("lt".to_string(), "<".to_string());
-
-    for c in body.chars() {
-      if c == '<' {
-        in_tag = true;
-      } else if c == '>' {
-        in_tag = false;
-      } else if c == '&' {
-        in_entity = true;
-      } else if c == ';' && in_entity {
-        in_entity = false;
-        if let Some(entity) = entities.get(&entity_value) {
-          print!("{}", entity);
-        }
-        entity_value.clear();
-      } else if in_entity {
-        entity_value.push(c);
-      } else if !in_tag {
-        print!("{}", c);
-      }
-    }
-  }
-}
-
-pub fn load(mut url_handler: URLHandler) -> Result<(), Box<dyn std::error::Error>> {
-  let body = url_handler.request()?;
-  show(&body, url_handler.view_source);
-  Ok(())
-}
+// pub fn load(mut url_handler: URLHandler) -> Result<(), Box<dyn std::error::Error>> {
+//   let body = url_handler.request()?;
+//   show(&body, url_handler.view_source);
+//   Ok(())
+// }
