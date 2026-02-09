@@ -345,17 +345,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "browser"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "iced",
- "lazy_static",
- "native-tls",
- "tokio",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2625,6 +2614,17 @@ name = "profiling"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eb8486b569e12e2c32ad3e204dbaba5e4b5b216e9367044f25f1dba42341773"
+
+[[package]]
+name = "project-agr"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "iced",
+ "lazy_static",
+ "native-tls",
+ "tokio",
+]
 
 [[package]]
 name = "quick-xml"

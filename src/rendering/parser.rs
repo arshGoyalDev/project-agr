@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-pub fn lex(body: String, view_source: bool) -> String {
+pub fn parser(body: String, view_source: bool) -> String {
   if view_source {
     return body;
   }

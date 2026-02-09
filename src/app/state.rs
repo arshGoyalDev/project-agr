@@ -2,7 +2,7 @@ use iced::{Element, Task, window, Subscription};
 use iced::widget::{container, canvas};
 
 use crate::app::Message;
-use crate::rendering::{DisplayList, lex, layout};
+use crate::rendering::{DisplayList, parser, layout};
 use crate::ui::{BrowserCanvas};
 
 use crate::net::URLHandler;
@@ -65,7 +65,7 @@ impl Browser {
         let body_result = url_handler.request();
         match body_result {
           Ok(value) => {
-            self.raw_body = lex(value, url_handler.view_source);
+            self.raw_body = parser(value, url_handler.view_source);
           }
           _ => ()
         }

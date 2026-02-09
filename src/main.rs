@@ -7,7 +7,7 @@ mod utils;
 use app::Browser;
 
 fn main() -> iced::Result {
-  iced::application("Browser", Browser::update, Browser::view)
+  iced::application("project-agr", Browser::update, Browser::view)
     .subscription(Browser::subscription)
     .run_with(Browser::new)
 }
