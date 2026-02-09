@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::{Error, ErrorKind};
 use std::net::TcpStream;
 use std::io::{Read, Write, BufRead, BufReader, self};
 use std::collections::HashMap;
@@ -38,22 +39,41 @@ impl URLHandler {
   pub fn init(&mut self, url: String, view_source: bool) {
     self.view_source = view_source;
 
-    if let Some((scheme, rest)) = url.split_once(':') {
+    match self.parse_url(url.clone()) {
+      Err(error) => {
+        println!("Malformed URL: {url}. Loading about:blank instead");
+        println!("{error:?}");
+        self.scheme = String::from("about");
+        self.data = String::from("Blank Page");
+      }
+      _ => ()
+    }
+  }
+
+  fn parse_url(&mut self, url:String) -> Result<(), Error> {
+    let (scheme, rest) = url.split_once(':')
+      .ok_or(Error::new(ErrorKind::InvalidInput, "Malformed URL: missing ':'"))?;
+
+    self.scheme = scheme.to_string();
+    self.url = rest.to_string();
+
+    if self.scheme == "view-source" {
+      self.view_source = true;
+      let (scheme, rest) = self.url.split_once(':')
+        .ok_or(Error::new(ErrorKind::InvalidInput, "Malformed URL: missing ':'"))?;
+
       self.scheme = scheme.to_string();
       self.url = rest.to_string();
     }
 
-    if self.scheme == "view-source" {
-      self.view_source = true;
-        if let Some((scheme, rest)) = self.url.split_once(":") {
-          self.scheme = scheme.to_string();
-          self.url = rest.to_string();
-        }
+    if self.scheme == "about" {
+      self.data = String::from("Blank Page");
+      return Ok(());
     }
 
     if self.scheme == "data" {
       if self.url.contains(",") {
-        if let Some((mediatype, data)) = self.url.split_once(",") {
+        if let Some((mediatype, data)) = self.url.split_once(',') {
           self.mediatype = mediatype.to_string();
           self.data = data.to_string();
         }
@@ -61,15 +81,19 @@ impl URLHandler {
           self.mediatype = "text/plain".to_string();
           self.data = self.url.clone();
       }
-    } else {
-      if let Some((_rest, url)) = self.url.split_once("//") {
-        self.url = url.to_string();
-      }
-      let allowed_schemes = ["http", "https", "file"];
-      assert!(
-        allowed_schemes.contains(&self.scheme.as_str()),
-          "Unsupported scheme"
-      );
+
+      return Ok(());
+    }
+
+    let (_rest, url) = self.url.split_once("//")
+      .ok_or(Error::new(ErrorKind::InvalidInput, "Malformed URL: missing '//' after scheme"))?;
+    self.url = url.to_string();
+
+    if !["http", "https", "file"].contains(&self.scheme.as_str()) {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!("Malformed URL: Unsupported scheme: {}", self.scheme)
+        ));
     }
 
     if self.scheme == "file" {
@@ -83,7 +107,7 @@ impl URLHandler {
         self.url = url.to_string();
       }
       self.path = "/".to_string() + &self.url;
-    
+
       if self.scheme == "http" {
         self.port = 80;
       } else if self.scheme == "https" {
@@ -92,11 +116,13 @@ impl URLHandler {
 
       if self.host.contains(":") {
         if let Some((host, port)) = self.host.split_once(":") {
-          self.port = port.parse::<u16>().expect("Invalid port number");
+          self.port = port.parse::<u16>().map_err(|_| Error::new(ErrorKind::InvalidInput, format!("Malformed URL: Invalid Port: {port}")))?;
           self.host = host.to_string();
         }
       }
+
     }
+    Ok(())
   }
 
   fn check_cache(&self, cache_key: &String) -> Option<String> {
@@ -131,7 +157,7 @@ impl URLHandler {
       .get("cache-control")
       .map(|s| s.as_str())
       .unwrap_or("");
-    
+
     if cache_control.contains("no-store") {
       return (false, None);
     }
@@ -175,6 +201,8 @@ impl URLHandler {
       if self.scheme == "file" {
         return Ok(fs::read_to_string(&self.path)?);
       } else if self.scheme == "data" {
+        return Ok(self.data.clone());
+      } else if self.scheme == "about" {
         return Ok(self.data.clone());
       } else {
         let cache_key = format!("{}://{}:{}{}", self.scheme, self.host, self.port, self.path);
@@ -250,10 +278,10 @@ impl URLHandler {
           );
         }
       }
-      
+
       if status.starts_with("3") {
         if let Some(location) = response_headers.get("location") {
-          
+
           // clear the buffer before redirecting (good practice)
           if response_headers.get("transfer-encoding").is_some() {
             self.read_chunked(&mut reader)?;
@@ -283,9 +311,9 @@ impl URLHandler {
           return Err(format!("Redirect without location header: {}", status).into());
         }
       }
-      
+
       let mut raw_bytes = if response_headers.get("transfer-encoding").map(|v| v.as_str()) == Some("chunked") {
-        self.read_chunked(&mut reader)? 
+        self.read_chunked(&mut reader)?
       } else if let Some(content_length) = response_headers.get("content-length") {
         let length: usize = content_length.parse().map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Content-Length"))?;
         let mut buffer = vec![0u8; length];
@@ -304,7 +332,7 @@ impl URLHandler {
         decoder.read_to_end(&mut decompressed_bytes)?;
         raw_bytes = decompressed_bytes;
       }
-      
+
       let content = String::from_utf8(raw_bytes)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8 sequence"))?;
 
@@ -336,17 +364,17 @@ impl URLHandler {
       return Ok(content);
       }
   }
-  
+
   fn read_chunked<R: BufRead>(&self ,reader: &mut R) -> io::Result<Vec<u8>> {
     let mut chunks = Vec::new();
-  
+
     loop {
       let mut line = String::new();
       reader.read_line(&mut line)?;
-          
+
       let chunk_size = usize::from_str_radix(line.trim(), 16)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid chunk size hex"))?;
-  
+
       if chunk_size == 0 {
         loop {
           let mut trailer_line = String::new();
@@ -357,11 +385,11 @@ impl URLHandler {
         }
         break;
       }
-  
+
       let mut chunk_data = vec![0u8; chunk_size];
       reader.read_exact(&mut chunk_data)?;
       chunks.extend(chunk_data);
-  
+
       let mut footer = String::new();
       reader.read_line(&mut footer)?;
     }
