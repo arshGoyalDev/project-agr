@@ -67,11 +67,12 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
       &self,
       _state: &Self::State,
       renderer: &iced::Renderer,
-      _theme: &iced::Theme,
+      theme: &iced::Theme,
       bounds: iced::Rectangle,
       _cursor: iced::mouse::Cursor,
   ) -> Vec<canvas::Geometry> {
     let mut frame = canvas::Frame::new(renderer, bounds.size());
+    let text_color = theme.palette().text;
 
     for item in self.display_list.items() {
       let screen_y = item.y - self.scroll_offset;
@@ -80,6 +81,7 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
         frame.fill_text(canvas::Text {
           content: item.character.to_string(),
           position: iced::Point::new(item.x, screen_y),
+          color: text_color,
           ..Default::default()
         });
       }

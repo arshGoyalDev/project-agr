@@ -21,7 +21,7 @@ pub struct Browser {
 
 impl Browser {
   pub fn new() -> (Self, Task<Message>) {
-    let mut url = String::from("file:///home/arshgoyal/Downloads/GOT.txt");
+    let mut url = String::from("about:blank");
     let args: Vec<String> = env::args().collect();
  
     match args.get(1) {
@@ -110,5 +110,9 @@ impl Browser {
       .height(iced::Length::Fill)
       .padding(10)
       .into()
+  }
+  
+  pub fn theme(&self) -> iced::Theme {
+    iced::Theme::Dark
   }
 }

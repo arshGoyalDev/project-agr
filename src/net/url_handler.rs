@@ -257,13 +257,21 @@ impl URLHandler {
 
       stream.write_all(request.as_bytes())?;
 
+      // TODO
+      // logic from handling the case when the server doesn't exist/respond back
+      // for now assuming server exists and responds
+    
+      // TODO
+      // implement persistent connection to a host
+      // reduces cpu usage in making same connections again and again
+      
       let mut reader = BufReader::new(stream);
-
+  
       let mut statusline = String::new();
       reader.read_line(&mut statusline)?;
       let parts: Vec<&str> = statusline.split_whitespace().collect();
       let status = parts.get(1).ok_or("Invalid status line")?;
-
+      
       let mut response_headers = HashMap::new();
       loop {
         let mut line = String::new();
@@ -398,42 +406,49 @@ impl URLHandler {
   }
 }
 
-// pub fn show(body: &str, view_source: bool) {
-//   if view_source {
-//     print!("{}", body);
-//   } else {
-//     let mut in_tag = false;
-//     let mut in_entity = false;
-//     let mut entity_value = String::new();
+pub fn show(body: &str, view_source: bool) {
+  print!("[Server]: ");
+  if view_source {
+    print!("{}", body);
+  } else {
+    let mut in_tag = false;
+    let mut in_entity = false;
+    let mut entity_value = String::new();
 
-//     let mut entities = HashMap::new();
-//     entities.insert("gt".to_string(), ">".to_string());
-//     entities.insert("lt".to_string(), "<".to_string());
+    let mut entities = HashMap::new();
+    entities.insert("gt".to_string(), ">".to_string());
+    entities.insert("lt".to_string(), "<".to_string());
 
-//     for c in body.chars() {
-//       if c == '<' {
-//         in_tag = true;
-//       } else if c == '>' {
-//         in_tag = false;
-//       } else if c == '&' {
-//         in_entity = true;
-//       } else if c == ';' && in_entity {
-//         in_entity = false;
-//         if let Some(entity) = entities.get(&entity_value) {
-//           print!("{}", entity);
-//         }
-//         entity_value.clear();
-//       } else if in_entity {
-//         entity_value.push(c);
-//       } else if !in_tag {
-//         print!("{}", c);
-//       }
-//     }
-//   }
-// }
+    for c in body.chars() {
+      if c == '<' {
+        in_tag = true;
+      } else if c == '>' {
+        in_tag = false;
+      } else if c == '&' {
+        in_entity = true;
+      } else if c == ';' && in_entity {
+        in_entity = false;
+        if let Some(entity) = entities.get(&entity_value) {
+          print!("{}", entity);
+        }
+        entity_value.clear();
+      } else if in_entity {
+        entity_value.push(c);
+      } else if !in_tag {
+        print!("{}", c);
+      }
+    }
+  }
+}
 
+pub fn load(url_handler: &mut URLHandler) -> Result<(), Box<dyn std::error::Error>> {
+    let body = url_handler.request()?;
+    show(&body, url_handler.view_source);
+    Ok(())
+}
 // pub fn load(mut url_handler: URLHandler) -> Result<(), Box<dyn std::error::Error>> {
 //   let body = url_handler.request()?;
 //   show(&body, url_handler.view_source);
 //   Ok(())
 // }
+
