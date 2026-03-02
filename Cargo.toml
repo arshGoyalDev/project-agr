@@ -3,10 +3,6 @@ name = "project-agr"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-name = "project_agr"
-path = "src/lib.rs"
-
 [dependencies]
 flate2 = "1.0"
 iced = {version = "0.13", features = ["canvas", "tokio"]}

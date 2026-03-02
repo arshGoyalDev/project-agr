@@ -4,4 +4,4 @@ mod parser;
 
 pub use layout::layout;
 pub use display_list::DisplayList;
-pub use parser::parser;
+pub use parser::{parser, HTMLParser, print_tree};
