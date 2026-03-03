@@ -16,13 +16,15 @@ const HEAD_TAGS: [&str; 9] = [
 pub struct HTMLParser {
   body: String,
   unfinished: Vec<Rc<RefCell<Node>>>,
+  head_closed: bool,
 }
 
 impl HTMLParser {
   pub fn new(body: String) -> Self {
     HTMLParser {
-      body: body,
+      body,
       unfinished: vec![],
+      head_closed: false,
     }
   }
 
@@ -30,20 +32,76 @@ impl HTMLParser {
     let body = self.body.clone();
     let mut text = String::new();
     let mut in_tag = false;
+    let mut in_comment = false;
+    let mut in_script = false;
 
-    for c in body.chars() {
-      if c == '<' {
-        in_tag = true;
-        if !text.is_empty() {
-          self.add_text(text.clone());
+    let chars: Vec<char> = body.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+      if in_comment {
+        if chars[i] == '-' && chars.get(i + 1) == Some(&'-') && chars.get(i + 2) == Some(&'>') {
+          in_comment = false;
+          i += 3;
+        } else {
+          i += 1;
         }
-        text.clear()
-      } else if c == '>' {
+      } else if in_script {
+        let close_tag = "</script>";
+        let remaining_len = chars.len() - i;
+
+        if remaining_len >= close_tag.len() {
+          let slice: String = chars[i..i + close_tag.len()].iter().collect();
+
+          if slice.to_lowercase() == close_tag {
+            if !text.is_empty() {
+              self.add_text(text.clone());
+              text.clear();
+            }
+            self.add_tag("/script".to_string());
+            in_script = false;
+            i += close_tag.len();
+            continue;
+          }
+        }
+
+        text.push(chars[i]);
+        i += 1;
+      } else if !in_tag && chars[i] == '<' {
+        if chars.get(i + 1) == Some(&'!')
+          && chars.get(i + 2) == Some(&'-')
+          && chars.get(i + 3) == Some(&'-')
+        {
+          if !text.is_empty() {
+            self.add_text(text.clone());
+            text.clear();
+          }
+          in_comment = true;
+          i += 4;
+        } else {
+          in_tag = true;
+          if !text.is_empty() {
+            self.add_text(text.clone());
+          }
+          text.clear();
+          i += 1;
+        }
+      } else if in_tag && chars[i] == '>' {
         in_tag = false;
-        self.add_tag(text.clone());
-        text.clear()
+        let tag_content = text.clone();
+        text.clear();
+
+        self.add_tag(tag_content.clone());
+
+        let trimmed = tag_content.trim().to_lowercase();
+        if trimmed == "script" || trimmed.starts_with("script ") {
+          in_script = true;
+        }
+
+        i += 1;
       } else {
-        text.push(c)
+        text.push(chars[i]);
+        i += 1;
       }
     }
 
@@ -80,6 +138,18 @@ impl HTMLParser {
       return;
     }
 
+    if tag == "/head" {
+      self.head_closed = true;
+
+      let body_open = self
+        .unfinished
+        .iter()
+        .any(|n| n.borrow().tag().map(|t| t == "body").unwrap_or(false));
+      if body_open {
+        return;
+      }
+    }
+
     self.implicit_tags(Some(&tag.clone()));
 
     if tag.starts_with('/') {
@@ -89,7 +159,6 @@ impl HTMLParser {
 
       let node = self.unfinished.pop().unwrap();
       let parent_rc = self.unfinished.last().unwrap().clone();
-
       parent_rc.borrow_mut().children_mut().push(node);
     } else if SELF_CLOSING_TAGS.contains(&tag.as_str()) {
       let parent_rc = self.unfinished.last().unwrap().clone();
@@ -113,7 +182,7 @@ impl HTMLParser {
         children: vec![],
       })));
 
-      self.unfinished.push(node)
+      self.unfinished.push(node);
     }
   }
 
@@ -172,7 +241,7 @@ impl HTMLParser {
       } else if open_tags == vec!["html"]
         && !matches!(tag, Some("head") | Some("body") | Some("/html"))
       {
-        if tag.map(|t| HEAD_TAGS.contains(&t)).unwrap_or(false) {
+        if tag.map(|t| HEAD_TAGS.contains(&t)).unwrap_or(false) && !self.head_closed {
           self.add_tag("head".to_string());
         } else {
           self.add_tag("body".to_string());
@@ -189,32 +258,33 @@ impl HTMLParser {
   }
 }
 
-// pub fn print_tree(node: &Rc<RefCell<Node>>, indent: usize) {
-//   let padding = " ".repeat(indent);
-//   let borrowed = node.borrow();
+pub fn print_tree(node: &Rc<RefCell<Node>>, indent: usize) {
+  let padding = " ".repeat(indent);
+  let borrowed = node.borrow();
 
-//   match &*borrowed {
-//     Node::Text(t) => println!("{}{:?}", padding, t.text),
-//     Node::Element(e) => {
-//       let mut s = String::new();
-//       s.push_str(&format!("{}<{}", padding, e.tag));
+  match &*borrowed {
+    Node::Text(t) => println!("{}{:?}", padding, t.text),
+    Node::Element(e) => {
+      let mut s = String::new();
+      s.push_str(&format!("{}<{}", padding, e.tag));
 
-//       for (key, value) in &e.attributes {
-//         s.push_str(&format!(" {}=\"{}\"", key, value));
-//       }
+      for (key, value) in &e.attributes {
+        s.push_str(&format!(" {}=\"{}\"", key, value));
+      }
 
-//       s.push('>');
+      s.push('>');
+      println!("{}", s);
 
-//       println!("{}", s);
-//       for child in &e.children {
-//         print_tree(child, indent + 2);
-//       }
-//       println!("{}</{}>", padding, e.tag);
-//       return;
-//     }
-//   }
+      for child in &e.children {
+        print_tree(child, indent + 2);
+      }
 
-//   for child in borrowed.children() {
-//     print_tree(child, indent + 2);
-//   }
-// }
+      println!("{}</{}>", padding, e.tag);
+      return;
+    }
+  }
+
+  for child in borrowed.children() {
+    print_tree(child, indent + 2);
+  }
+}

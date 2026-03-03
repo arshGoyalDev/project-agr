@@ -5,3 +5,4 @@ mod parser;
 pub use display_list::DisplayList;
 pub use layout::Layout;
 pub use parser::HTMLParser;
+pub use parser::print_tree;

@@ -79,17 +79,21 @@ impl Layout {
             for word in line.split(' ') {
               self.word(word.to_string());
             }
-            
+
             self.flush();
           }
         } else {
           for word in text.text.split_whitespace() {
             self.word(word.to_string());
-          }          
+          }
         }
       }
       Node::Element(element) => {
         self.open_tag(&element.tag);
+        
+        if element.tag == "script" {
+          return;
+        }
 
         for child in &element.children {
           self.recurse(&Rc::clone(child));
@@ -118,9 +122,9 @@ impl Layout {
 
     for item in &self.line {
       let y = if item.is_superscript {
-          baseline - item.size*2.0
+        baseline - item.size * 2.0
       } else {
-          baseline - item.size
+        baseline - item.size
       };
 
       self
@@ -152,7 +156,7 @@ impl Layout {
 
     let word_size = make_paragraph(&word).min_bounds();
     let space_size = make_paragraph(" ").min_bounds();
-    
+
     if word.is_empty() {
       self.cursor_x += space_size.width;
       return;
@@ -163,7 +167,11 @@ impl Layout {
     }
 
     self.line.push(LineItem {
-      x: if self.is_superscript {self.cursor_x - space_size.width} else {self.cursor_x},
+      x: if self.is_superscript {
+        self.cursor_x - space_size.width
+      } else {
+        self.cursor_x
+      },
       word,
       font,
       size: self.size,

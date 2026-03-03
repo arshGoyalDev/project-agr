@@ -3,7 +3,7 @@ use iced::{Element, Subscription, Task, window};
 
 use crate::app::Message;
 use crate::net::URLHandler;
-use crate::rendering::{DisplayList, HTMLParser, Layout};
+use crate::rendering::{DisplayList, HTMLParser, Layout, print_tree};
 use crate::ui::BrowserCanvas;
 use crate::utils::Node;
 
@@ -73,6 +73,7 @@ impl Browser {
 
         match &self.tree {
           Some(node) => {
+            print_tree(node, 0);
             let layout = Layout::new(node, self.width);
             self.display_list = layout.display_list;
           }
