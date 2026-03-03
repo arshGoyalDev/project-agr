@@ -1,10 +1,10 @@
+use std::collections::HashMap;
 use std::fs;
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::io::{Error, ErrorKind};
 use std::net::TcpStream;
-use std::io::{Read, Write, BufRead, BufReader, self};
-use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use native_tls::TlsConnector;
 
@@ -46,21 +46,25 @@ impl URLHandler {
         self.scheme = String::from("about");
         self.data = String::from("Blank Page");
       }
-      _ => ()
+      _ => (),
     }
   }
 
-  fn parse_url(&mut self, url:String) -> Result<(), Error> {
-    let (scheme, rest) = url.split_once(':')
-      .ok_or(Error::new(ErrorKind::InvalidInput, "Malformed URL: missing ':'"))?;
+  fn parse_url(&mut self, url: String) -> Result<(), Error> {
+    let (scheme, rest) = url.split_once(':').ok_or(Error::new(
+      ErrorKind::InvalidInput,
+      "Malformed URL: missing ':'",
+    ))?;
 
     self.scheme = scheme.to_string();
     self.url = rest.to_string();
 
     if self.scheme == "view-source" {
       self.view_source = true;
-      let (scheme, rest) = self.url.split_once(':')
-        .ok_or(Error::new(ErrorKind::InvalidInput, "Malformed URL: missing ':'"))?;
+      let (scheme, rest) = self.url.split_once(':').ok_or(Error::new(
+        ErrorKind::InvalidInput,
+        "Malformed URL: missing ':'",
+      ))?;
 
       self.scheme = scheme.to_string();
       self.url = rest.to_string();
@@ -78,22 +82,24 @@ impl URLHandler {
           self.data = data.to_string();
         }
       } else {
-          self.mediatype = "text/plain".to_string();
-          self.data = self.url.clone();
+        self.mediatype = "text/plain".to_string();
+        self.data = self.url.clone();
       }
 
       return Ok(());
     }
 
-    let (_rest, url) = self.url.split_once("//")
-      .ok_or(Error::new(ErrorKind::InvalidInput, "Malformed URL: missing '//' after scheme"))?;
+    let (_rest, url) = self.url.split_once("//").ok_or(Error::new(
+      ErrorKind::InvalidInput,
+      "Malformed URL: missing '//' after scheme",
+    ))?;
     self.url = url.to_string();
 
     if !["http", "https", "file"].contains(&self.scheme.as_str()) {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            format!("Malformed URL: Unsupported scheme: {}", self.scheme)
-        ));
+      return Err(Error::new(
+        ErrorKind::InvalidInput,
+        format!("Malformed URL: Unsupported scheme: {}", self.scheme),
+      ));
     }
 
     if self.scheme == "file" {
@@ -116,11 +122,15 @@ impl URLHandler {
 
       if self.host.contains(":") {
         if let Some((host, port)) = self.host.split_once(":") {
-          self.port = port.parse::<u16>().map_err(|_| Error::new(ErrorKind::InvalidInput, format!("Malformed URL: Invalid Port: {port}")))?;
+          self.port = port.parse::<u16>().map_err(|_| {
+            Error::new(
+              ErrorKind::InvalidInput,
+              format!("Malformed URL: Invalid Port: {port}"),
+            )
+          })?;
           self.host = host.to_string();
         }
       }
-
     }
     Ok(())
   }
@@ -148,7 +158,11 @@ impl URLHandler {
     None
   }
 
-  fn should_cache(&self, response_headers: &HashMap<String, String>, status: &str) -> (bool, Option<u64>) {
+  fn should_cache(
+    &self,
+    response_headers: &HashMap<String, String>,
+    status: &str,
+  ) -> (bool, Option<u64>) {
     if status != "200" {
       return (false, None);
     }
@@ -233,7 +247,7 @@ impl URLHandler {
     &mut self,
     stream: S,
     redirects: &mut i32,
-    cache_key: &str
+    cache_key: &str,
   ) -> Result<String, Box<dyn std::error::Error>> {
     const REDIRECT_LIMIT: i32 = 10;
 
@@ -260,18 +274,18 @@ impl URLHandler {
       // TODO
       // logic from handling the case when the server doesn't exist/respond back
       // for now assuming server exists and responds
-    
+
       // TODO
       // implement persistent connection to a host
       // reduces cpu usage in making same connections again and again
-      
+
       let mut reader = BufReader::new(stream);
-  
+
       let mut statusline = String::new();
       reader.read_line(&mut statusline)?;
       let parts: Vec<&str> = statusline.split_whitespace().collect();
       let status = parts.get(1).ok_or("Invalid status line")?;
-      
+
       let mut response_headers = HashMap::new();
       loop {
         let mut line = String::new();
@@ -280,16 +294,12 @@ impl URLHandler {
           break;
         }
         if let Some((header, value)) = line.split_once(":") {
-          response_headers.insert(
-            header.trim().to_lowercase(),
-            value.trim().to_string(),
-          );
+          response_headers.insert(header.trim().to_lowercase(), value.trim().to_string());
         }
       }
 
       if status.starts_with("3") {
         if let Some(location) = response_headers.get("location") {
-
           // clear the buffer before redirecting (good practice)
           if response_headers.get("transfer-encoding").is_some() {
             self.read_chunked(&mut reader)?;
@@ -320,10 +330,16 @@ impl URLHandler {
         }
       }
 
-      let mut raw_bytes = if response_headers.get("transfer-encoding").map(|v| v.as_str()) == Some("chunked") {
+      let mut raw_bytes = if response_headers
+        .get("transfer-encoding")
+        .map(|v| v.as_str())
+        == Some("chunked")
+      {
         self.read_chunked(&mut reader)?
       } else if let Some(content_length) = response_headers.get("content-length") {
-        let length: usize = content_length.parse().map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Content-Length"))?;
+        let length: usize = content_length
+          .parse()
+          .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid Content-Length"))?;
         let mut buffer = vec![0u8; length];
         reader.read_exact(&mut buffer)?;
         buffer
@@ -344,7 +360,7 @@ impl URLHandler {
       let content = String::from_utf8(raw_bytes)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8 sequence"))?;
 
-      let (should_cache, max_age) = self.should_cache(&response_headers,status);
+      let (should_cache, max_age) = self.should_cache(&response_headers, status);
       if should_cache {
         let current_time = SystemTime::now()
           .duration_since(UNIX_EPOCH)
@@ -370,10 +386,10 @@ impl URLHandler {
       }
 
       return Ok(content);
-      }
+    }
   }
 
-  fn read_chunked<R: BufRead>(&self ,reader: &mut R) -> io::Result<Vec<u8>> {
+  fn read_chunked<R: BufRead>(&self, reader: &mut R) -> io::Result<Vec<u8>> {
     let mut chunks = Vec::new();
 
     loop {
@@ -406,49 +422,48 @@ impl URLHandler {
   }
 }
 
-pub fn show(body: &str, view_source: bool) {
-  print!("[Server]: ");
-  if view_source {
-    print!("{}", body);
-  } else {
-    let mut in_tag = false;
-    let mut in_entity = false;
-    let mut entity_value = String::new();
+// pub fn show(body: &str, view_source: bool) {
+//   print!("[Server]: ");
+//   if view_source {
+//     print!("{}", body);
+//   } else {
+//     let mut in_tag = false;
+//     let mut in_entity = false;
+//     let mut entity_value = String::new();
 
-    let mut entities = HashMap::new();
-    entities.insert("gt".to_string(), ">".to_string());
-    entities.insert("lt".to_string(), "<".to_string());
+//     let mut entities = HashMap::new();
+//     entities.insert("gt".to_string(), ">".to_string());
+//     entities.insert("lt".to_string(), "<".to_string());
 
-    for c in body.chars() {
-      if c == '<' {
-        in_tag = true;
-      } else if c == '>' {
-        in_tag = false;
-      } else if c == '&' {
-        in_entity = true;
-      } else if c == ';' && in_entity {
-        in_entity = false;
-        if let Some(entity) = entities.get(&entity_value) {
-          print!("{}", entity);
-        }
-        entity_value.clear();
-      } else if in_entity {
-        entity_value.push(c);
-      } else if !in_tag {
-        print!("{}", c);
-      }
-    }
-  }
-}
-
-pub fn load(url_handler: &mut URLHandler) -> Result<(), Box<dyn std::error::Error>> {
-    let body = url_handler.request()?;
-    show(&body, url_handler.view_source);
-    Ok(())
-}
-// pub fn load(mut url_handler: URLHandler) -> Result<(), Box<dyn std::error::Error>> {
-//   let body = url_handler.request()?;
-//   show(&body, url_handler.view_source);
-//   Ok(())
+//     for c in body.chars() {
+//       if c == '<' {
+//         in_tag = true;
+//       } else if c == '>' {
+//         in_tag = false;
+//       } else if c == '&' {
+//         in_entity = true;
+//       } else if c == ';' && in_entity {
+//         in_entity = false;
+//         if let Some(entity) = entities.get(&entity_value) {
+//           print!("{}", entity);
+//         }
+//         entity_value.clear();
+//       } else if in_entity {
+//         entity_value.push(c);
+//       } else if !in_tag {
+//         print!("{}", c);
+//       }
+//     }
+//   }
 // }
 
+// pub fn load(url_handler: &mut URLHandler) -> Result<(), Box<dyn std::error::Error>> {
+//     let body = url_handler.request()?;
+//     show(&body, url_handler.view_source);
+//     Ok(())
+// }
+// // pub fn load(mut url_handler: URLHandler) -> Result<(), Box<dyn std::error::Error>> {
+// //   let body = url_handler.request()?;
+// //   show(&body, url_handler.view_source);
+// //   Ok(())
+// // }

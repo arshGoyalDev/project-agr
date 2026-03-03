@@ -1,7 +1,7 @@
-mod layout;
 mod display_list;
+mod layout;
 mod parser;
 
-pub use layout::layout;
 pub use display_list::DisplayList;
-pub use parser::{parser, HTMLParser, print_tree};
+pub use layout::Layout;
+pub use parser::HTMLParser;

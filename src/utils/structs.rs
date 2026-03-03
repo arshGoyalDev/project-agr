@@ -1,23 +1,23 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
-use std::cell::RefCell;
 
 pub enum Node {
   Text(Text),
-  Element(Element)
+  Element(Element),
 }
 
 pub struct Text {
   pub text: String,
   pub children: Vec<Rc<RefCell<Node>>>,
-  pub parent: Option<Weak<RefCell<Node>>>
+  pub parent: Option<Weak<RefCell<Node>>>,
 }
 
 pub struct Element {
   pub tag: String,
   pub children: Vec<Rc<RefCell<Node>>>,
   pub attributes: HashMap<String, String>,
-  pub parent: Option<Weak<RefCell<Node>>>
+  pub parent: Option<Weak<RefCell<Node>>>,
 }
 
 impl Node {

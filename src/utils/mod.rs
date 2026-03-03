@@ -1,3 +1,3 @@
 mod structs;
 
-pub use structs::{Text, Element, Node};
+pub use structs::{Element, Node, Text};
