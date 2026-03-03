@@ -45,13 +45,14 @@ pub struct Layout {
   is_center: bool,
   is_superscript: bool,
   is_preformatted: bool,
+  needs_space: bool,
 }
 
 impl Layout {
   pub fn new(tree: &Rc<RefCell<Node>>, width: f32) -> Self {
     let mut layout = Self {
       display_list: DisplayList::new(),
-      width: width,
+      width,
       cursor_x: HSTEP,
       cursor_y: VSTEP,
       line: vec![],
@@ -62,6 +63,7 @@ impl Layout {
       is_center: false,
       is_superscript: false,
       is_preformatted: false,
+      needs_space: false,
     };
 
     layout.recurse(tree);
@@ -74,26 +76,30 @@ impl Layout {
 
     match &*node {
       Node::Text(text) => {
+        let decoded = decode_entities(&text.text);
         if self.is_preformatted {
-          for line in text.text.split('\n') {
+          for line in decoded.split('\n') {
             for word in line.split(' ') {
               self.word(word.to_string());
             }
-
             self.flush();
           }
         } else {
-          for word in text.text.split_whitespace() {
+          let words: Vec<&str> = decoded.split_whitespace().collect();
+          for (i, word) in words.iter().enumerate() {
+            if i == 0 && !decoded.starts_with(|c: char| c.is_whitespace()) {
+              self.needs_space = false;
+            }
             self.word(word.to_string());
           }
         }
       }
       Node::Element(element) => {
-        self.open_tag(&element.tag);
-        
         if element.tag == "script" {
           return;
         }
+
+        self.open_tag(&element.tag);
 
         for child in &element.children {
           self.recurse(&Rc::clone(child));
@@ -107,11 +113,10 @@ impl Layout {
   pub fn flush(&mut self) {
     if self.line.is_empty() {
       return;
-    };
+    }
 
     let max_ascent = self.line.iter().map(|i| i.size * 0.8).fold(0.0, f32::max);
     let baseline = self.cursor_y + 1.2 * max_ascent;
-    let max_size = self.line.iter().map(|i| i.size).fold(0.0_f32, f32::max);
 
     let line_width = self.cursor_x - HSTEP;
     let offset = if self.is_center {
@@ -134,6 +139,7 @@ impl Layout {
 
     self.cursor_y = baseline + 1.25 * max_ascent;
     self.cursor_x = HSTEP;
+    self.needs_space = false;
     self.line.clear();
   }
 
@@ -162,23 +168,45 @@ impl Layout {
       return;
     }
 
-    if !self.is_preformatted && self.cursor_x + word_size.width > self.width - HSTEP {
+    let space_advance = if self.needs_space {
+      space_size.width
+    } else {
+      0.0
+    };
+
+    if !self.is_preformatted && self.cursor_x + space_advance + word_size.width > self.width - HSTEP
+    {
       self.flush();
+
+      self.line.push(LineItem {
+        x: if self.is_superscript {
+          self.cursor_x - space_size.width
+        } else {
+          self.cursor_x
+        },
+        word,
+        font,
+        size: self.size,
+        is_superscript: self.is_superscript,
+      });
+
+      self.cursor_x += word_size.width;
+    } else {
+      self.line.push(LineItem {
+        x: if self.is_superscript {
+          self.cursor_x + space_advance - space_size.width
+        } else {
+          self.cursor_x + space_advance
+        },
+        word,
+        font,
+        size: self.size,
+        is_superscript: self.is_superscript,
+      });
+      self.cursor_x += space_advance + word_size.width;
     }
 
-    self.line.push(LineItem {
-      x: if self.is_superscript {
-        self.cursor_x - space_size.width
-      } else {
-        self.cursor_x
-      },
-      word,
-      font,
-      size: self.size,
-      is_superscript: self.is_superscript,
-    });
-
-    self.cursor_x += word_size.width + space_size.width
+    self.needs_space = true;
   }
 
   pub fn get_font(&mut self, weight: Weight, style: Style) -> Font {
@@ -206,11 +234,10 @@ impl Layout {
       }
       "sup" => {
         self.is_superscript = true;
-        self.size /= 2.0
+        self.size /= 2.0;
       }
       "p" => {
         self.flush();
-        self.cursor_y += VSTEP;
       }
       "pre" => {
         self.flush();
@@ -233,7 +260,11 @@ impl Layout {
       }
       "sup" => {
         self.is_superscript = false;
-        self.size *= 2.0
+        self.size *= 2.0;
+      }
+      "p" => {
+        self.flush();
+        self.cursor_y += VSTEP;
       }
       "pre" => {
         self.flush();
@@ -242,4 +273,75 @@ impl Layout {
       _ => (),
     }
   }
+}
+
+fn decode_entities(text: &str) -> String {
+  let mut result = String::with_capacity(text.len());
+  let mut chars = text.chars().peekable();
+
+  while let Some(c) = chars.next() {
+    if c != '&' {
+      result.push(c);
+      continue;
+    }
+
+    let mut entity = String::new();
+    let mut terminated = false;
+
+    for nc in chars.by_ref() {
+      if nc == ';' {
+        terminated = true;
+        break;
+      } else if nc.is_whitespace() {
+        entity.push(nc);
+        break;
+      } else {
+        entity.push(nc);
+      }
+    }
+
+    if terminated {
+      let replacement = match entity.as_str() {
+        "lt" => Some("<"),
+        "gt" => Some(">"),
+        "amp" => Some("&"),
+        "quot" => Some("\""),
+        "apos" => Some("'"),
+        "copy" => Some("©"),
+        _ => None,
+      };
+
+      if let Some(r) = replacement {
+        result.push_str(r);
+      } else if entity.starts_with('#') {
+        let code = if entity.starts_with("#x") || entity.starts_with("#X") {
+          u32::from_str_radix(&entity[2..], 16).ok()
+        } else {
+          entity[1..].parse::<u32>().ok()
+        };
+        if let Some(n) = code {
+          if let Some(ch) = char::from_u32(n) {
+            result.push(ch);
+          } else {
+            result.push('&');
+            result.push_str(&entity);
+            result.push(';');
+          }
+        } else {
+          result.push('&');
+          result.push_str(&entity);
+          result.push(';');
+        }
+      } else {
+        result.push('&');
+        result.push_str(&entity);
+        result.push(';');
+      }
+    } else {
+      result.push('&');
+      result.push_str(&entity);
+    }
+  }
+
+  result
 }

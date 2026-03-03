@@ -3,7 +3,7 @@ use iced::{Element, Subscription, Task, window};
 
 use crate::app::Message;
 use crate::net::URLHandler;
-use crate::rendering::{DisplayList, HTMLParser, Layout, print_tree};
+use crate::rendering::{DisplayList, HTMLParser, Layout, print_tree, syntax_highlight};
 use crate::ui::BrowserCanvas;
 use crate::utils::Node;
 
@@ -63,6 +63,8 @@ impl Browser {
 
         let body_result = url_handler.request();
 
+        // self.view_source = url_handler.view_source;
+
         match body_result {
           Ok(value) => {
             let mut html_parser = HTMLParser::new(value);
@@ -73,7 +75,19 @@ impl Browser {
 
         match &self.tree {
           Some(node) => {
-            print_tree(node, 0);
+            if url_handler.view_source {
+              let highlighted = syntax_highlight(node);
+
+              let mut html_parser = HTMLParser::new(highlighted);
+              self.tree = Some(html_parser.parse());
+            }
+          }
+          _ => (),
+        }
+
+        match &self.tree {
+          Some(node) => {
+            // print_tree(node, 0);
             let layout = Layout::new(node, self.width);
             self.display_list = layout.display_list;
           }
@@ -133,6 +147,6 @@ impl Browser {
   }
 
   pub fn theme(&self) -> iced::Theme {
-    iced::Theme::Dark
+    iced::Theme::Light
   }
 }
