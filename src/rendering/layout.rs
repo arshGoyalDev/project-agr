@@ -29,6 +29,7 @@ struct LineItem {
   word: String,
   font: Font,
   size: f32,
+  is_superscript: bool,
 }
 
 pub struct Layout {
@@ -41,6 +42,9 @@ pub struct Layout {
   style: Style,
   size: f32,
   font_cache: HashMap<FontKey, Font>,
+  is_center: bool,
+  is_superscript: bool,
+  is_preformatted: bool,
 }
 
 impl Layout {
@@ -55,6 +59,9 @@ impl Layout {
       style: Style::Normal,
       size: 16.0,
       font_cache: HashMap::new(),
+      is_center: false,
+      is_superscript: false,
+      is_preformatted: false,
     };
 
     layout.recurse(tree);
@@ -67,8 +74,18 @@ impl Layout {
 
     match &*node {
       Node::Text(text) => {
-        for word in text.text.split_whitespace() {
-          self.word(word.to_string());
+        if self.is_preformatted {
+          for line in text.text.split('\n') {
+            for word in line.split(' ') {
+              self.word(word.to_string());
+            }
+            
+            self.flush();
+          }
+        } else {
+          for word in text.text.split_whitespace() {
+            self.word(word.to_string());
+          }          
         }
       }
       Node::Element(element) => {
@@ -90,13 +107,25 @@ impl Layout {
 
     let max_ascent = self.line.iter().map(|i| i.size * 0.8).fold(0.0, f32::max);
     let baseline = self.cursor_y + 1.2 * max_ascent;
+    let max_size = self.line.iter().map(|i| i.size).fold(0.0_f32, f32::max);
+
+    let line_width = self.cursor_x - HSTEP;
+    let offset = if self.is_center {
+      (self.width - line_width) / 2.0 - HSTEP
+    } else {
+      0.0
+    };
 
     for item in &self.line {
-      let y = baseline - item.size;
+      let y = if item.is_superscript {
+          baseline - item.size*2.0
+      } else {
+          baseline - item.size
+      };
 
       self
         .display_list
-        .add_item(item.x, y, item.word.clone(), item.font, item.size)
+        .add_item(item.x + offset, y, item.word.clone(), item.font, item.size)
     }
 
     self.cursor_y = baseline + 1.25 * max_ascent;
@@ -123,18 +152,25 @@ impl Layout {
 
     let word_size = make_paragraph(&word).min_bounds();
     let space_size = make_paragraph(" ").min_bounds();
+    
+    if word.is_empty() {
+      self.cursor_x += space_size.width;
+      return;
+    }
 
-    if self.cursor_x + word_size.width > self.width - HSTEP {
+    if !self.is_preformatted && self.cursor_x + word_size.width > self.width - HSTEP {
       self.flush();
     }
 
     self.line.push(LineItem {
-      x: self.cursor_x,
+      x: if self.is_superscript {self.cursor_x - space_size.width} else {self.cursor_x},
       word,
       font,
       size: self.size,
+      is_superscript: self.is_superscript,
     });
-    self.cursor_x += word_size.width + space_size.width;
+
+    self.cursor_x += word_size.width + space_size.width
   }
 
   pub fn get_font(&mut self, weight: Weight, style: Style) -> Font {
@@ -156,9 +192,22 @@ impl Layout {
       "small" => self.size -= 4.0,
       "big" => self.size += 4.0,
       "br" => self.flush(),
+      "center" => {
+        self.flush();
+        self.is_center = true;
+      }
+      "sup" => {
+        self.is_superscript = true;
+        self.size /= 2.0
+      }
       "p" => {
         self.flush();
         self.cursor_y += VSTEP;
+      }
+      "pre" => {
+        self.flush();
+        self.cursor_y += VSTEP;
+        self.is_preformatted = true;
       }
       _ => (),
     }
@@ -170,6 +219,18 @@ impl Layout {
       "b" => self.weight = Weight::Normal,
       "small" => self.size += 4.0,
       "big" => self.size -= 4.0,
+      "center" => {
+        self.flush();
+        self.is_center = false;
+      }
+      "sup" => {
+        self.is_superscript = false;
+        self.size *= 2.0
+      }
+      "pre" => {
+        self.flush();
+        self.is_preformatted = false;
+      }
       _ => (),
     }
   }
