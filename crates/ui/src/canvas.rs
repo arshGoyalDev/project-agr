@@ -1,8 +1,8 @@
 use iced::widget::canvas;
 use iced::{Color, Pixels, Point, Size};
 
-use crate::app::Message;
-use crate::rendering::DisplayList;
+use crate::message::Message;
+use layout::DisplayList;
 
 pub struct BrowserCanvas<'a> {
   pub display_list: &'a DisplayList,

@@ -1,5 +1,5 @@
-use crate::rendering::DisplayList;
-use crate::utils::Node;
+use crate::display_list::DisplayList;
+use html_parser::Node;
 
 use iced::advanced::graphics::text::Paragraph as GraphicsParagraph;
 use iced::advanced::text::Paragraph;

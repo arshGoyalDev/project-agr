@@ -1,0 +1,8 @@
+[package]
+name    = "layout"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+html-parser = { path = "../html-parser" }
+iced     = { workspace = true }

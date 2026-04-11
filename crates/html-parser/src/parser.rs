@@ -1,4 +1,4 @@
-use crate::utils::{Element, Node, Text};
+use crate::node::{Element, Node, Text};
 
 use std::cell::RefCell;
 use std::collections::HashMap;

@@ -1,4 +1,4 @@
-use crate::utils::Node;
+use html_parser::{Element, Node};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,7 +13,7 @@ fn walk(node: &Rc<RefCell<Node>>, out: &mut String, depth: usize) {
   let borrowed = node.borrow();
 
   match &*borrowed {
-    crate::utils::Node::Text(t) => {
+    Node::Text(t) => {
       let trimmed = t.text.trim();
       if trimmed.is_empty() {
         return;
@@ -24,7 +24,7 @@ fn walk(node: &Rc<RefCell<Node>>, out: &mut String, depth: usize) {
       out.push_str("</b>");
       out.push('\n');
     }
-    crate::utils::Node::Element(e) => {
+    Node::Element(e) => {
       out.push_str(&indent(depth));
       out.push_str(&escape_html(&format_open_tag(e)));
       out.push('\n');
@@ -46,11 +46,11 @@ fn indent(depth: usize) -> String {
   " ".repeat(depth)
 }
 
-fn format_open_tag(e: &crate::utils::Element) -> String {
+fn format_open_tag(e: &Element) -> String {
   let mut s = format!("<{}", e.tag);
 
   let mut attrs: Vec<(&String, &String)> = e.attributes.iter().collect();
-  attrs.sort_by_key(|(k, _)| k.as_str());
+  attrs.sort_by_key(|(k, _): &(&String, &String)| k.as_str());
 
   for (key, value) in attrs {
     if value.is_empty() {

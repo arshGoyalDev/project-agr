@@ -1,11 +1,10 @@
 use iced::widget::{canvas, container};
 use iced::{Element, Subscription, Task, window};
 
-use crate::app::Message;
-use crate::net::URLHandler;
-use crate::rendering::{DisplayList, HTMLParser, Layout, print_tree, syntax_highlight};
-use crate::ui::BrowserCanvas;
-use crate::utils::Node;
+use html_parser::{HTMLParser, Node};
+use layout::{DisplayList, Layout, syntax_highlight};
+use net::URLHandler;
+use ui::{BrowserCanvas, Message};
 
 use std::cell::RefCell;
 use std::env;

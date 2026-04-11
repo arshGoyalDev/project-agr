@@ -1,10 +1,6 @@
-mod app;
-mod net;
-mod rendering;
-mod ui;
-mod utils;
+mod state;
 
-use app::Browser;
+use state::Browser;
 
 fn main() -> iced::Result {
   iced::application("project-agr", Browser::update, Browser::view)

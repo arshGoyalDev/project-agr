@@ -1,11 +1,13 @@
-[package]
-name = "project-agr"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = [
+  "crates/net",
+  "crates/html-parser",
+  "crates/layout",
+  "crates/ui",
+  "crates/app",
+]
+resolver = "2"
 
-[dependencies]
-flate2 = "1.0"
-iced = {version = "0.13", features = ["canvas", "tokio", "advanced"]}
+[workspace.dependencies]
+iced = { version = "0.13", features = ["canvas", "tokio", "advanced"] }
 tokio = { version = "1", features = ["full"] }
-native-tls = "0.2"
-lazy_static = "1.4"

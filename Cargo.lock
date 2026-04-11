@@ -25,6 +25,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "agr-app"
+version = "0.1.0"
+dependencies = [
+ "html-parser",
+ "iced",
+ "layout",
+ "net",
+ "tokio",
+ "ui",
+]
+
+[[package]]
 name = "ahash"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1382,6 +1394,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
+name = "html-parser"
+version = "0.1.0"
+
+[[package]]
 name = "iced"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1648,6 +1664,14 @@ checksum = "1618d4ebd923e97d67e7cd363d80aef35fe961005cbbbb3d2dad8bdd1bc63440"
 dependencies = [
  "arrayvec",
  "smallvec",
+]
+
+[[package]]
+name = "layout"
+version = "0.1.0"
+dependencies = [
+ "html-parser",
+ "iced",
 ]
 
 [[package]]
@@ -1933,6 +1957,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee6cda3051665f1fb8d9e08fc35c96d5a244fb1be711a03b71118828afc9a873"
 dependencies = [
  "jni-sys",
+]
+
+[[package]]
+name = "net"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "lazy_static",
+ "native-tls",
 ]
 
 [[package]]
@@ -2614,17 +2647,6 @@ name = "profiling"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eb8486b569e12e2c32ad3e204dbaba5e4b5b216e9367044f25f1dba42341773"
-
-[[package]]
-name = "project-agr"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "iced",
- "lazy_static",
- "native-tls",
- "tokio",
-]
 
 [[package]]
 name = "quick-xml"
@@ -3463,6 +3485,14 @@ dependencies = [
  "memoffset",
  "tempfile",
  "winapi",
+]
+
+[[package]]
+name = "ui"
+version = "0.1.0"
+dependencies = [
+ "iced",
+ "layout",
 ]
 
 [[package]]

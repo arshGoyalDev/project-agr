@@ -1,0 +1,16 @@
+[package]
+name    = "agr-app"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "agr"
+path = "src/main.rs"
+
+[dependencies]
+net    = { path = "../net" }
+html-parser   = { path = "../html-parser" }
+layout = { path = "../layout" }
+ui     = { path = "../ui" }
+iced       = { workspace = true }
+tokio      = { workspace = true }
