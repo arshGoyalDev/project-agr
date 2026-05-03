@@ -2,7 +2,7 @@ use iced::widget::{canvas, container};
 use iced::{Element, Subscription, Task, window};
 
 use html_parser::{HTMLParser, Node};
-use layout::{DisplayList, Layout, syntax_highlight};
+use layout::{DisplayList, DocumentLayout, paint_tree_document, syntax_highlight};
 use net::URLHandler;
 use ui::{BrowserCanvas, Message};
 
@@ -16,8 +16,9 @@ pub struct Browser {
   pub current_url: String,
   pub max_y: f32,
   pub width: f32,
-  pub tree: Option<Rc<RefCell<Node>>>,
   pub height: f32,
+  pub tree: Option<Rc<RefCell<Node>>>,
+  pub document: Option<DocumentLayout>,
 }
 
 impl Browser {
@@ -25,11 +26,8 @@ impl Browser {
     let mut url = String::from("about:blank");
     let args: Vec<String> = env::args().collect();
 
-    match args.get(1) {
-      Some(value) => {
-        url = value.to_string();
-      }
-      _ => (),
+    if let Some(value) = args.get(1) {
+      url = value.to_string();
     }
 
     (
@@ -37,8 +35,9 @@ impl Browser {
         display_list: DisplayList::new(),
         scroll_offset: 0.0,
         max_y: 0.0,
-        current_url: String::from(url),
+        current_url: url,
         tree: None,
+        document: None,
         width: 0.0,
         height: 0.0,
       },
@@ -50,19 +49,29 @@ impl Browser {
     window::resize_events().map(|(_id, size)| Message::WindowResized(size.width, size.height))
   }
 
+  fn relayout(&mut self) {
+    if let Some(doc) = &mut self.document {
+      doc.layout(self.width);
+
+      self.display_list = DisplayList::new();
+      paint_tree_document(doc, &mut self.display_list);
+
+      self.max_y = self.display_list.max_y();
+    }
+  }
+
   pub fn update(&mut self, message: Message) -> Task<Message> {
     match message {
       Message::ScrollChanged(offset) => {
         self.scroll_offset = offset;
         Task::none()
       }
+
       Message::LoadUrl() => {
         let mut url_handler = URLHandler::default();
         url_handler.init(self.current_url.clone(), false);
 
         let body_result = url_handler.request();
-
-        // self.view_source = url_handler.view_source;
 
         match body_result {
           Ok(value) => {
@@ -72,55 +81,34 @@ impl Browser {
           _ => (),
         }
 
-        match &self.tree {
-          Some(node) => {
-            if url_handler.view_source {
-              let highlighted = syntax_highlight(node);
-
-              let mut html_parser = HTMLParser::new(highlighted);
-              self.tree = Some(html_parser.parse());
-            }
+        // Handle view-source syntax highlighting
+        if url_handler.view_source {
+          if let Some(node) = &self.tree {
+            let highlighted = syntax_highlight(node);
+            let mut html_parser = HTMLParser::new(highlighted);
+            self.tree = Some(html_parser.parse());
           }
-          _ => (),
         }
 
-        match &self.tree {
-          Some(node) => {
-            // print_tree(node, 0);
-            let layout = Layout::new(node, self.width);
-            self.display_list = layout.display_list;
-          }
-          _ => (),
-        }
+        // Build DocumentLayout and paint
+        if let Some(node) = &self.tree {
+          let mut doc = DocumentLayout::new(node);
+          doc.layout(self.width);
 
-        self.max_y = self
-          .display_list
-          .items()
-          .iter()
-          .map(|item| item.y)
-          .fold(0.0, f32::max);
+          self.display_list = DisplayList::new();
+          paint_tree_document(&doc, &mut self.display_list);
+
+          self.max_y = self.display_list.max_y();
+          self.document = Some(doc);
+        }
 
         Task::none()
       }
+
       Message::WindowResized(width, height) => {
         self.width = width;
         self.height = height;
-
-        match &self.tree {
-          Some(node) => {
-            let layout = Layout::new(node, self.width);
-            self.display_list = layout.display_list;
-          }
-          _ => (),
-        }
-
-        self.max_y = self
-          .display_list
-          .items()
-          .iter()
-          .map(|item| item.y)
-          .fold(0.0, f32::max);
-
+        self.relayout();
         Task::none()
       }
     }
