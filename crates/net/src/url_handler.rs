@@ -420,6 +420,28 @@ impl URLHandler {
 
     Ok(chunks)
   }
+
+  pub fn resolve(&self, link: &str) -> String {
+    if link.contains("://") {
+      return link.to_string();
+    }
+
+    let mut url = link.to_string();
+
+    if !url.starts_with('/') {
+      let dir = match self.path.rfind('/') {
+        Some(idx) => &self.path[..idx],
+        None => &self.path,
+      };
+      url = format!("{}/{}", dir, url);
+    }
+
+    if url.starts_with("//") {
+      format!("{}:{}", self.scheme, url)
+    } else {
+      format!("{}://{}:{}{}", self.scheme, self.host, self.port, url)
+    }
+  }
 }
 
 // pub fn show(body: &str, view_source: bool) {

@@ -10,6 +10,7 @@ path = "src/main.rs"
 [dependencies]
 net    = { path = "../net" }
 html-parser   = { path = "../html-parser" }
+css-parser = { path = "../css-parser" }
 layout = { path = "../layout" }
 ui     = { path = "../ui" }
 iced       = { workspace = true }

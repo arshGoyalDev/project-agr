@@ -2,6 +2,7 @@
 members = [
   "crates/net",
   "crates/html-parser",
+  "crates/css-parser",
   "crates/layout",
   "crates/ui",
   "crates/app",

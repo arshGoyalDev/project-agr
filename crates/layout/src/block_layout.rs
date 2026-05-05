@@ -1,5 +1,5 @@
 use crate::display_list::DisplayList;
-use crate::layout::{HSTEP, VSTEP, BLOCK_ELEMENTS, PRE_BG, decode_entities};
+use crate::layout::{HSTEP, VSTEP, decode_entities};
 use html_parser::Node;
 
 use iced::advanced::graphics::text::Paragraph as GraphicsParagraph;
@@ -9,16 +9,18 @@ use iced::alignment;
 use iced::font::{Font, Style, Weight};
 use iced::widget::text::Wrapping;
 use iced::widget::text::{LineHeight, Shaping};
-use iced::{Pixels, Size};
+use iced::{Color, Pixels, Size};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct FontKey {
-  pub weight: Weight,
-  pub style: Style,
+  family: String,
+  weight: Weight,
+  style: Style,
+  size_pts: u32,
 }
 
 struct LineItem {
@@ -26,11 +28,12 @@ struct LineItem {
   word: String,
   font: Font,
   size: f32,
+  color: Color,
   is_superscript: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum LayoutMode {
+pub enum LayoutMode {
   Block,
   Inline,
 }
@@ -44,7 +47,6 @@ pub struct BlockLayout {
   pub height: f32,
   pub display_list: DisplayList,
 
-  // Inline layout state (only used when mode == Inline)
   cursor_x: f32,
   cursor_y: f32,
   weight: Weight,
@@ -89,18 +91,21 @@ impl BlockLayout {
     }
   }
 
-  fn layout_mode(&self) -> LayoutMode {
+  pub fn layout_mode(&self) -> LayoutMode {
     let node = self.node.borrow();
     match &*node {
       Node::Text(_) => LayoutMode::Inline,
       Node::Element(e) => {
-        // If any child Element has a block tag → block mode
         let has_block_child = e.children.iter().any(|c| {
-          let c = c.borrow();
-          match &*c {
-            Node::Element(ce) => BLOCK_ELEMENTS.contains(&ce.tag.as_str()),
-            _ => false,
-          }
+          let child_node = c.borrow();
+
+          let display = child_node
+            .style()
+            .get("display")
+            .map(|s| s.as_str())
+            .unwrap_or("inline");
+
+          display == "block"
         });
 
         if has_block_child {
@@ -118,11 +123,24 @@ impl BlockLayout {
     let mode = self.layout_mode();
 
     if mode == LayoutMode::Block {
-      // Build child BlockLayouts first, then lay each out
       let node = self.node.borrow();
+      let style_map = node.style();
+
+      let css_width = style_map
+        .get("width")
+        .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok());
+
+      let css_height = style_map
+        .get("height")
+        .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok());
+
       let children_nodes: Vec<Rc<RefCell<Node>>> =
         node.children().iter().map(|c| Rc::clone(c)).collect();
       drop(node);
+
+      if let Some(w) = css_width {
+        self.width = w;
+      }
 
       let mut previous_bottom: Option<f32> = None;
       for child_node in children_nodes {
@@ -133,9 +151,12 @@ impl BlockLayout {
         self.children.push(child);
       }
 
-      self.height = self.children.iter().map(|c| c.height).sum();
+      if let Some(h) = css_height {
+        self.height = h;
+      } else {
+        self.height = self.children.iter().map(|c| c.height).sum();
+      }
     } else {
-      // Inline mode
       self.cursor_x = 0.0;
       self.cursor_y = 0.0;
       self.weight = Weight::Normal;
@@ -155,27 +176,32 @@ impl BlockLayout {
     let mut cmds = DisplayList::new();
 
     let node = self.node.borrow();
-    if let Node::Element(e) = &*node {
-      if e.tag == "pre" {
+
+    let bgcolor = node
+      .style()
+      .get("background-color")
+      .cloned()
+      .unwrap_or_else(|| "transparent".to_string());
+
+    if bgcolor != "transparent" {
+      if let Some(color) = parse_css_color(&bgcolor) {
         cmds.add_rect(
           self.x,
           self.y,
           self.x + self.width,
           self.y + self.height,
-          PRE_BG,
+          color,
         );
       }
     }
 
-    // Inline text commands are appended by paint_tree after the rect
     if self.layout_mode() == LayoutMode::Inline {
       cmds.extend(&self.display_list);
     }
 
     cmds
   }
-  
-  
+
   fn recurse(&mut self, node_rc: &Rc<RefCell<Node>>) {
     let node = node_rc.borrow();
     match &*node {
@@ -184,7 +210,7 @@ impl BlockLayout {
         if self.is_preformatted {
           for line in decoded.split('\n') {
             for word in line.split(' ') {
-              self.word(word.to_string());
+              self.word(node_rc, word.to_string());
             }
             self.flush();
           }
@@ -194,7 +220,7 @@ impl BlockLayout {
             if i == 0 && !decoded.starts_with(|c: char| c.is_whitespace()) {
               self.needs_space = false;
             }
-            self.word(word.to_string());
+            self.word(node_rc, word.to_string());
           }
         }
       }
@@ -212,15 +238,46 @@ impl BlockLayout {
           self.recurse(child);
         }
         self.close_tag(&tag);
-        return; // already dropped node above
+        return;
       }
     }
   }
 
-  fn word(&mut self, word: String) {
-    let font = self.get_font(self.weight, self.style);
+  fn word(&mut self, node_rc: &Rc<RefCell<Node>>, word: String) {
+    let node = node_rc.borrow();
+    let style_map = node.style();
 
-    let make_paragraph = |content: &str, size: f32| {
+    let weight = match style_map.get("font-weight").map(|s| s.as_str()) {
+      Some("bold") => Weight::Bold,
+      _ => Weight::Normal,
+    };
+
+    let style = match style_map.get("font-style").map(|s| s.as_str()) {
+      Some("italic") | Some("oblique") => Style::Italic,
+      _ => Style::Normal,
+    };
+
+    let size: f32 = style_map
+      .get("font-size")
+      .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok())
+      .map(|px| px * 0.75)
+      .unwrap_or(12.0);
+
+    let color = style_map
+      .get("color")
+      .and_then(|s| parse_css_color(s))
+      .unwrap_or(Color::BLACK);
+
+    let family = style_map
+      .get("font-family")
+      .cloned()
+      .unwrap_or_else(|| "sans-serif".to_string());
+
+    drop(node);
+
+    let font = self.get_font(family, weight, style, size);
+
+    let make_paragraph = |content: &str| {
       GraphicsParagraph::with_text(AdvancedText {
         content,
         bounds: Size::INFINITY,
@@ -234,8 +291,8 @@ impl BlockLayout {
       })
     };
 
-    let word_size = make_paragraph(&word, self.size).min_bounds();
-    let space_size = make_paragraph(" ", self.size).min_bounds();
+    let word_size = make_paragraph(&word).min_bounds();
+    let space_size = make_paragraph(" ").min_bounds();
 
     if word.is_empty() {
       self.cursor_x += space_size.width;
@@ -255,7 +312,8 @@ impl BlockLayout {
         x: self.cursor_x,
         word,
         font,
-        size: self.size,
+        size,
+        color,
         is_superscript: self.is_superscript,
       });
       self.cursor_x += word_size.width;
@@ -268,7 +326,8 @@ impl BlockLayout {
         },
         word,
         font,
-        size: self.size,
+        size,
+        color,
         is_superscript: self.is_superscript,
       });
       self.cursor_x += space_advance + word_size.width;
@@ -287,7 +346,7 @@ impl BlockLayout {
       .iter()
       .map(|i| i.size * 0.8)
       .fold(0.0_f32, f32::max);
-    let baseline = self.cursor_y + 1.2 * max_ascent;
+    let baseline = self.cursor_y + 1.25 * max_ascent;
 
     let line_width = self.cursor_x - HSTEP;
     let offset = if self.is_center {
@@ -297,17 +356,20 @@ impl BlockLayout {
     };
 
     for item in &self.line {
-      let rel_x = item.x + offset;
-      // absolute x = self.x (block's left edge) + rel_x
-      let abs_x = self.x + rel_x;
+      let abs_x = self.x + item.x + offset;
       let y = if item.is_superscript {
         self.y + baseline - item.size * 2.0
       } else {
         self.y + baseline - item.size
       };
-      self
-        .display_list
-        .add_text(abs_x, y, item.word.clone(), item.font, item.size);
+      self.display_list.add_text(
+        abs_x,
+        y,
+        item.word.clone(),
+        item.font,
+        item.size,
+        item.color,
+      );
     }
 
     let max_descent = self
@@ -321,22 +383,34 @@ impl BlockLayout {
     self.line.clear();
   }
 
-  fn get_font(&mut self, weight: Weight, style: Style) -> Font {
-    let key = FontKey { weight, style };
-    let font_ref = self.font_cache.entry(key).or_insert(Font {
+  fn get_font(&mut self, family_str: String, weight: Weight, style: Style, size: f32) -> Font {
+    let key = FontKey {
+      family: family_str.to_string(),
       weight,
       style,
-      ..Font::DEFAULT
-    });
-    *font_ref
+      size_pts: size as u32,
+    };
+
+    *self.font_cache.entry(key).or_insert_with(|| {
+      let family = match family_str.to_lowercase().as_str() {
+        "monospace" | "courier" | "consolas" => iced::font::Family::Monospace,
+        "serif" | "times" | "times new roman" | "georgia" => iced::font::Family::Serif,
+        "cursive" | "comic sans ms" => iced::font::Family::Cursive,
+        "fantasy" | "impact" => iced::font::Family::Fantasy,
+        _ => iced::font::Family::SansSerif,
+      };
+
+      Font {
+        family,
+        weight,
+        style,
+        ..Font::DEFAULT
+      }
+    })
   }
 
   fn open_tag(&mut self, tag: &str) {
     match tag {
-      "i" => self.style = Style::Italic,
-      "b" => self.weight = Weight::Bold,
-      "small" => self.size -= 2.0,
-      "big" => self.size += 4.0,
       "br" => self.flush(),
       "p" => {
         self.flush();
@@ -361,10 +435,6 @@ impl BlockLayout {
 
   fn close_tag(&mut self, tag: &str) {
     match tag {
-      "i" => self.style = Style::Normal,
-      "b" => self.weight = Weight::Normal,
-      "small" => self.size += 2.0,
-      "big" => self.size -= 4.0,
       "p" => {
         self.flush();
         self.cursor_y += VSTEP;
@@ -384,4 +454,45 @@ impl BlockLayout {
       _ => (),
     }
   }
+}
+
+pub fn parse_css_color(s: &str) -> Option<Color> {
+  let s = s.trim();
+
+  match s {
+    "black" => return Some(Color::BLACK),
+    "white" => return Some(Color::WHITE),
+    "red" => return Some(Color::from_rgb(1.0, 0.0, 0.0)),
+    "green" => return Some(Color::from_rgb(0.0, 0.502, 0.0)),
+    "blue" => return Some(Color::from_rgb(0.0, 0.0, 1.0)),
+    "gray" | "grey" => return Some(Color::from_rgb(0.502, 0.502, 0.502)),
+    "yellow" => return Some(Color::from_rgb(1.0, 1.0, 0.0)),
+    "orange" => return Some(Color::from_rgb(1.0, 0.647, 0.0)),
+    "purple" => return Some(Color::from_rgb(0.502, 0.0, 0.502)),
+    "transparent" => return None,
+    _ => {}
+  }
+  // #rrggbb
+  if s.starts_with('#') && s.len() == 7 {
+    let r = u8::from_str_radix(&s[1..3], 16).ok()?;
+    let g = u8::from_str_radix(&s[3..5], 16).ok()?;
+    let b = u8::from_str_radix(&s[5..7], 16).ok()?;
+    return Some(Color::from_rgb(
+      r as f32 / 255.0,
+      g as f32 / 255.0,
+      b as f32 / 255.0,
+    ));
+  }
+  // #rgb shorthand
+  if s.starts_with('#') && s.len() == 4 {
+    let r = u8::from_str_radix(&s[1..2].repeat(2), 16).ok()?;
+    let g = u8::from_str_radix(&s[2..3].repeat(2), 16).ok()?;
+    let b = u8::from_str_radix(&s[3..4].repeat(2), 16).ok()?;
+    return Some(Color::from_rgb(
+      r as f32 / 255.0,
+      g as f32 / 255.0,
+      b as f32 / 255.0,
+    ));
+  }
+  None
 }

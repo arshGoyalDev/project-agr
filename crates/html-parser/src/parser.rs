@@ -126,6 +126,7 @@ impl HTMLParser {
       text,
       parent: Some(parent_weak),
       children: vec![],
+      style: HashMap::new(),
     })));
 
     parent_rc.borrow_mut().children_mut().push(node);
@@ -169,6 +170,7 @@ impl HTMLParser {
         attributes,
         parent: Some(parent_weak),
         children: vec![],
+        style: HashMap::new(),
       })));
 
       parent_rc.borrow_mut().children_mut().push(node);
@@ -180,6 +182,7 @@ impl HTMLParser {
         attributes,
         parent: parent_weak,
         children: vec![],
+        style: HashMap::new(),
       })));
 
       self.unfinished.push(node);

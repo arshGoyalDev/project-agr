@@ -60,12 +60,11 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
     &self,
     _state: &Self::State,
     renderer: &iced::Renderer,
-    theme: &iced::Theme,
+    _theme: &iced::Theme,
     bounds: iced::Rectangle,
     _cursor: iced::mouse::Cursor,
   ) -> Vec<canvas::Geometry> {
     let mut frame = canvas::Frame::new(renderer, bounds.size());
-    let text_color = theme.palette().text;
 
     for cmd in self.display_list.items() {
       let top = cmd.top() - self.scroll_offset;
@@ -80,7 +79,7 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
           frame.fill_text(canvas::Text {
             content: t.word.clone(),
             position: Point::new(t.x, screen_y),
-            color: text_color,
+            color: t.color,
             font: t.font,
             size: Pixels(t.size),
             ..Default::default()
@@ -88,20 +87,11 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
         }
         DrawCommand::Rect(r) => {
           let screen_y = r.y1 - self.scroll_offset;
-          let [red, green, blue, alpha] = r.color;
           let rect = canvas::Path::rectangle(
             Point::new(r.x1, screen_y),
             Size::new(r.x2 - r.x1, r.y2 - r.y1),
           );
-          frame.fill(
-            &rect,
-            Color {
-              r: red,
-              g: green,
-              b: blue,
-              a: alpha,
-            },
-          );
+          frame.fill(&rect, r.color);
         }
       }
     }

@@ -1,8 +1,7 @@
+use crate::block_layout::BlockLayout;
 use crate::display_list::DisplayList;
 use crate::document_layout::DocumentLayout;
-use crate::block_layout::BlockLayout;
 use html_parser::Node;
-
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -10,58 +9,6 @@ use std::rc::Rc;
 pub const HSTEP: f32 = 9.0;
 pub const VSTEP: f32 = 15.0;
 pub const PRE_BG: [f32; 4] = [0.5, 0.5, 0.5, 1.0];
-
-pub const BLOCK_ELEMENTS: &[&str] = &[
-  "html",
-  "body",
-  "article",
-  "section",
-  "nav",
-  "aside",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "hgroup",
-  "header",
-  "footer",
-  "address",
-  "p",
-  "hr",
-  "pre",
-  "blockquote",
-  "ol",
-  "ul",
-  "menu",
-  "li",
-  "dl",
-  "dt",
-  "dd",
-  "figure",
-  "figcaption",
-  "main",
-  "div",
-  "table",
-  "form",
-  "fieldset",
-  "legend",
-  "details",
-  "summary",
-  "canvas",
-  "video",
-  "audio",
-  "noscript",
-  "template",
-  "caption",
-  "thead",
-  "tbody",
-  "tfoot",
-  "tr",
-  "colgroup",
-  "col",
-];
 
 pub fn paint_tree(layout: &BlockLayout, display_list: &mut DisplayList) {
   display_list.extend(&layout.paint());

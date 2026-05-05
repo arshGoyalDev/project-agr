@@ -5,4 +5,5 @@ Cargo.lock
 *~
 .DS_Store
 
+*.css
 *.html

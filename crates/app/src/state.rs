@@ -1,6 +1,7 @@
 use iced::widget::{canvas, container};
 use iced::{Element, Subscription, Task, window};
 
+use css_parser::{CSSParser, style};
 use html_parser::{HTMLParser, Node};
 use layout::{DisplayList, DocumentLayout, paint_tree_document, syntax_highlight};
 use net::URLHandler;
@@ -81,7 +82,6 @@ impl Browser {
           _ => (),
         }
 
-        // Handle view-source syntax highlighting
         if url_handler.view_source {
           if let Some(node) = &self.tree {
             let highlighted = syntax_highlight(node);
@@ -90,7 +90,30 @@ impl Browser {
           }
         }
 
-        // Build DocumentLayout and paint
+        if let Some(node) = &self.tree {
+          let default_css = include_str!("../../../browser.css").to_string();
+          let mut css_parser = CSSParser::new(&default_css);
+          let mut rules = css_parser.parse();
+
+          let mut links = Vec::new();
+          find_stylesheet_links(node, &mut links);
+
+          for link in links {
+            let resolved_url = url_handler.resolve(&link);
+            let mut style_handler = URLHandler::default();
+            style_handler.init(resolved_url, false);
+
+            if let Ok(css_body) = style_handler.request() {
+              let mut linked_parser = CSSParser::new(&css_body);
+              rules.extend(linked_parser.parse());
+            }
+          }
+
+          rules.sort_by(|a, b| a.selector.priority().cmp(&b.selector.priority()));
+
+          style(node, &rules);
+        }
+
         if let Some(node) = &self.tree {
           let mut doc = DocumentLayout::new(node);
           doc.layout(self.width);
@@ -135,5 +158,25 @@ impl Browser {
 
   pub fn theme(&self) -> iced::Theme {
     iced::Theme::Light
+  }
+}
+
+fn find_stylesheet_links(node_rc: &Rc<RefCell<Node>>, links: &mut Vec<String>) {
+  let node = node_rc.borrow();
+
+  if let Node::Element(e) = &*node {
+    if e.tag == "link" {
+      if let Some(rel) = e.attributes.get("rel") {
+        if rel == "stylesheet" {
+          if let Some(href) = e.attributes.get("href") {
+            links.push(href.clone());
+          }
+        }
+      }
+    }
+  }
+
+  for child in node.children() {
+    find_stylesheet_links(child, links);
   }
 }

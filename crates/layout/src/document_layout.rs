@@ -1,5 +1,5 @@
-use crate::display_list::DisplayList;
 use crate::block_layout::BlockLayout;
+use crate::display_list::DisplayList;
 use crate::layout::{HSTEP, VSTEP};
 
 use html_parser::Node;
@@ -38,13 +38,7 @@ impl DocumentLayout {
     self.y = VSTEP;
     self.width = browser_width - 2.0 * HSTEP;
 
-    let mut child = BlockLayout::new(
-      Rc::clone(&self.node),
-      self.x,
-      self.y,
-      self.width,
-      None,
-    );
+    let mut child = BlockLayout::new(Rc::clone(&self.node), self.x, self.y, self.width, None);
     child.layout();
     self.height = child.height;
     self.children.push(child);

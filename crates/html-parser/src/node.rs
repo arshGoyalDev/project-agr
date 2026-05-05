@@ -11,6 +11,7 @@ pub struct Text {
   pub text: String,
   pub children: Vec<Rc<RefCell<Node>>>,
   pub parent: Option<Weak<RefCell<Node>>>,
+  pub style: HashMap<String, String>,
 }
 
 pub struct Element {
@@ -18,6 +19,7 @@ pub struct Element {
   pub children: Vec<Rc<RefCell<Node>>>,
   pub attributes: HashMap<String, String>,
   pub parent: Option<Weak<RefCell<Node>>>,
+  pub style: HashMap<String, String>,
 }
 
 impl Node {
@@ -39,6 +41,20 @@ impl Node {
     match self {
       Node::Element(e) => &mut e.children,
       Node::Text(t) => &mut t.children,
+    }
+  }
+
+  pub fn style(&self) -> &HashMap<String, String> {
+    match self {
+      Node::Element(e) => &e.style,
+      Node::Text(t) => &t.style,
+    }
+  }
+
+  pub fn style_mut(&mut self) -> &mut HashMap<String, String> {
+    match self {
+      Node::Element(e) => &mut e.style,
+      Node::Text(t) => &mut t.style,
     }
   }
 }

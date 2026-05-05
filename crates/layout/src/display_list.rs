@@ -1,3 +1,4 @@
+use iced::Color;
 use iced::font::Font;
 
 #[derive(Debug, Clone)]
@@ -7,6 +8,7 @@ pub struct DrawText {
   pub word: String,
   pub font: Font,
   pub size: f32,
+  pub color: Color,
   pub bottom: f32,
 }
 
@@ -16,7 +18,8 @@ pub struct DrawRect {
   pub y1: f32,
   pub x2: f32,
   pub y2: f32,
-  pub color: [f32; 4], 
+  // pub width: f
+  pub color: Color,
   pub bottom: f32,
 }
 
@@ -33,7 +36,6 @@ impl DrawCommand {
       DrawCommand::Rect(r) => r.y1,
     }
   }
-
   pub fn bottom(&self) -> f32 {
     match self {
       DrawCommand::Text(t) => t.bottom,
@@ -52,7 +54,7 @@ impl DisplayList {
     Self { items: Vec::new() }
   }
 
-  pub fn add_text(&mut self, x: f32, y: f32, word: String, font: Font, size: f32) {
+  pub fn add_text(&mut self, x: f32, y: f32, word: String, font: Font, size: f32, color: Color) {
     let bottom = y + size * 1.4;
     self.items.push(DrawCommand::Text(DrawText {
       x,
@@ -60,11 +62,12 @@ impl DisplayList {
       word,
       font,
       size,
+      color,
       bottom,
     }));
   }
 
-  pub fn add_rect(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: [f32; 4]) {
+  pub fn add_rect(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: Color) {
     self.items.push(DrawCommand::Rect(DrawRect {
       x1,
       y1,
@@ -87,7 +90,7 @@ impl DisplayList {
     self
       .items
       .iter()
-      .map(|cmd| cmd.bottom())
+      .map(|c| c.bottom())
       .fold(0.0_f32, f32::max)
   }
 }
