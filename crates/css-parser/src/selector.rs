@@ -67,3 +67,49 @@ impl Selector for DescendantSelector {
     self.priority
   }
 }
+
+pub struct ClassSelector {
+  pub class: String,
+}
+
+impl Selector for ClassSelector {
+  fn matches(&self, node: &Node) -> bool {
+    match node {
+      Node::Element(e) => {
+        if let Some(classes) = e.attributes.get("class") {
+          classes.split_whitespace().any(|c| c == self.class)
+        } else {
+          false
+        }
+      }
+      _ => false,
+    }
+  }
+
+  fn priority(&self) -> u32 {
+    10
+  }
+}
+
+pub struct IdSelector {
+  pub id: String,
+}
+
+impl Selector for IdSelector {
+  fn matches(&self, node: &Node) -> bool {
+    match node {
+      Node::Element(e) => {
+        if let Some(id) = e.attributes.get("id") {
+          id == &self.id
+        } else {
+          false
+        }
+      }
+      _ => false,
+    }
+  }
+
+  fn priority(&self) -> u32 {
+    100
+  }
+}
