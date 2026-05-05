@@ -109,7 +109,14 @@ impl Browser {
             }
           }
 
-          rules.sort_by(|a, b| a.selector.priority().cmp(&b.selector.priority()));
+          let mut inline_style_texts = Vec::new();
+          find_inline_styles(node, &mut inline_style_texts);
+          for css_text in inline_style_texts {
+            rules.extend(CSSParser::new(&css_text).parse());
+          }
+
+          rules.sort_by_key(|r| r.priority);
+          // rules.sort_by(|a, b| a.selector.priority().cmp(&b.selector.priority()));
 
           style(node, &rules);
         }
@@ -161,7 +168,7 @@ impl Browser {
   }
 }
 
-fn find_stylesheet_links(node_rc: &Rc<RefCell<Node>>, links: &mut Vec<String>) {
+pub fn find_stylesheet_links(node_rc: &Rc<RefCell<Node>>, links: &mut Vec<String>) {
   let node = node_rc.borrow();
 
   if let Node::Element(e) = &*node {
@@ -178,5 +185,24 @@ fn find_stylesheet_links(node_rc: &Rc<RefCell<Node>>, links: &mut Vec<String>) {
 
   for child in node.children() {
     find_stylesheet_links(child, links);
+  }
+}
+
+pub fn find_inline_styles(node_rc: &Rc<RefCell<Node>>, inline_rules: &mut Vec<String>) {
+  let node = node_rc.borrow();
+
+  if let Node::Element(e) = &*node {
+    if e.tag == "style" {
+      for child_rc in &e.children {
+        let child = child_rc.borrow();
+        if let Node::Text(t) = &*child {
+          inline_rules.push(t.text.clone());
+        }
+      }
+    }
+  }
+
+  for child in node.children() {
+    find_inline_styles(child, inline_rules);
   }
 }

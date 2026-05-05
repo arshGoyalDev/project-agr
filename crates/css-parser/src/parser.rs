@@ -1,5 +1,4 @@
 use crate::selector::{ClassSelector, DescendantSelector, IdSelector, Selector, TagSelector};
-
 use std::collections::HashMap;
 
 pub fn inherited_properties() -> HashMap<&'static str, &'static str> {
@@ -12,9 +11,15 @@ pub fn inherited_properties() -> HashMap<&'static str, &'static str> {
   map
 }
 
+#[derive(Debug, Clone)]
+pub struct PropertyValue {
+  pub value: String,
+  pub important: bool,
+}
+
 pub struct Rule {
   pub selector: Box<dyn Selector>,
-  pub properties: HashMap<String, String>,
+  pub properties: HashMap<String, PropertyValue>,
   pub priority: u32,
 }
 
@@ -81,8 +86,6 @@ impl CSSParser {
     None
   }
 
-  // NEW: Reads an entire CSS value until the semi-colon or closing brace
-  // This allows for values with spaces, commas, quotes, etc.
   fn property_value(&mut self) -> Result<String, String> {
     let start = self.i;
     while self.i < self.s.len() {
@@ -105,23 +108,22 @@ impl CSSParser {
     }
   }
 
-  fn pair(&mut self) -> Result<(String, String), String> {
+  fn pair(&mut self) -> Result<(String, PropertyValue), String> {
     let prop = self.word()?;
     self.whitespace();
     self.literal(':')?;
     self.whitespace();
 
-    // UPDATED: Use property_value instead of word to allow spaces/commas in values
-    let val = self.property_value()?;
+    // Use the new helper to check for !important
+    let val = self.property_value_with_important()?;
     Ok((prop.to_lowercase(), val))
   }
 
-  pub fn body(&mut self) -> HashMap<String, String> {
+  pub fn body(&mut self) -> HashMap<String, PropertyValue> {
     let mut pairs = HashMap::new();
 
     loop {
       self.whitespace();
-      // Stop at end of string or closing brace
       if self.i >= self.s.len() || self.s[self.i] == '}' {
         break;
       }
@@ -129,34 +131,35 @@ impl CSSParser {
       match self.pair() {
         Ok((prop, val)) => {
           if prop == "font" {
-            for (p, v) in self.expand_font_shorthand(&val) {
-              pairs.insert(p, v);
+            // Expand shorthand while preserving the important flag
+            for (p, v) in self.expand_font_shorthand(&val.value) {
+              pairs.insert(
+                p,
+                PropertyValue {
+                  value: v,
+                  important: val.important,
+                },
+              );
             }
           } else {
             pairs.insert(prop, val);
           }
-          
+
           self.whitespace();
-          
-          // consume the semicolon if present
           if self.i < self.s.len() && self.s[self.i] == ';' {
             self.i += 1;
           }
           self.whitespace();
         }
-        Err(_) => {
-          // Skip to next ';' or '}' and recover
-          match self.ignore_until(&[';', '}']) {
-            Some(';') => {
-              self.i += 1; // consume ';'
-              self.whitespace();
-            }
-            _ => break,
+        Err(_) => match self.ignore_until(&[';', '}']) {
+          Some(';') => {
+            self.i += 1;
+            self.whitespace();
           }
-        }
+          _ => break,
+        },
       }
     }
-
     pairs
   }
 
@@ -165,11 +168,11 @@ impl CSSParser {
 
     let mut out: Box<dyn Selector> = if word.starts_with('#') {
       Box::new(IdSelector {
-        id: word[1..].to_lowercase(), // Strip the '#'
+        id: word[1..].to_lowercase(),
       })
     } else if word.starts_with('.') {
       Box::new(ClassSelector {
-        class: word[1..].to_lowercase(), // Strip the '.'
+        class: word[1..].to_lowercase(),
       })
     } else {
       Box::new(TagSelector {
@@ -179,10 +182,8 @@ impl CSSParser {
 
     self.whitespace();
 
-    // Stop if we hit `{` or `,`
     while self.i < self.s.len() && self.s[self.i] != '{' && self.s[self.i] != ',' {
       let word = self.word()?;
-
       let descendant: Box<dyn Selector> = if word.starts_with('#') {
         Box::new(IdSelector {
           id: word[1..].to_lowercase(),
@@ -196,11 +197,9 @@ impl CSSParser {
           tag: word.to_lowercase(),
         })
       };
-
       out = Box::new(DescendantSelector::new(out, descendant));
       self.whitespace();
     }
-
     Ok(out)
   }
 
@@ -210,7 +209,6 @@ impl CSSParser {
       self.whitespace();
       sels.push(self.single_selector()?);
       self.whitespace();
-
       if self.i < self.s.len() && self.s[self.i] == ',' {
         self.i += 1;
       } else {
@@ -222,7 +220,6 @@ impl CSSParser {
 
   pub fn parse(&mut self) -> Vec<Rule> {
     let mut rules = Vec::new();
-
     loop {
       self.whitespace();
       if self.i >= self.s.len() {
@@ -235,12 +232,11 @@ impl CSSParser {
             self.whitespace();
             let properties = self.body();
             let _ = self.literal('}');
-
             for selector in selectors {
               let priority = selector.priority();
               rules.push(Rule {
                 selector,
-                properties: properties.clone(),
+                properties: properties.clone(), // This now clones PropertyValues
                 priority,
               });
             }
@@ -260,14 +256,13 @@ impl CSSParser {
         },
       }
     }
-
     rules
   }
-  
+
   fn expand_font_shorthand(&self, value: &str) -> HashMap<String, String> {
     let mut expanded = HashMap::new();
     let parts: Vec<&str> = value.split_whitespace().collect();
-    
+
     for part in parts {
       match part.to_lowercase().as_str() {
         "italic" | "oblique" => {
@@ -284,7 +279,21 @@ impl CSSParser {
         }
       }
     }
-    
     expanded
+  }
+
+  fn property_value_with_important(&mut self) -> Result<PropertyValue, String> {
+    let mut raw_val = self.property_value()?;
+    let mut important = false;
+
+    if raw_val.ends_with("!important") {
+      important = true;
+      raw_val = raw_val.trim_end_matches("!important").trim().to_string();
+    }
+
+    Ok(PropertyValue {
+      value: raw_val,
+      important,
+    })
   }
 }

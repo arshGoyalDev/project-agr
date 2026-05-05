@@ -8,86 +8,100 @@ use std::rc::Rc;
 pub fn style(node_rc: &Rc<RefCell<HtmlNode>>, rules: &[Rule]) {
   let inherited = inherited_properties();
 
+  // We use this to track the highest priority seen so far for each property
+  let mut priority_tracker: HashMap<String, u32> = HashMap::new();
+
   {
     let mut node = node_rc.borrow_mut();
 
+    // 1. Get Parent Styles for Inheritance
     let parent_styles: HashMap<String, String> = match &*node {
-      HtmlNode::Element(e) => {
-        if let Some(parent_weak) = &e.parent {
-          if let Some(parent_rc) = parent_weak.upgrade() {
-            let parent = parent_rc.borrow();
-            parent.style().clone()
-          } else {
-            HashMap::new()
-          }
-        } else {
-          HashMap::new()
-        }
-      }
-      HtmlNode::Text(t) => {
-        if let Some(parent_weak) = &t.parent {
-          if let Some(parent_rc) = parent_weak.upgrade() {
-            let parent = parent_rc.borrow();
-            parent.style().clone()
-          } else {
-            HashMap::new()
-          }
-        } else {
-          HashMap::new()
-        }
-      }
+      HtmlNode::Element(e) => e
+        .parent
+        .as_ref()
+        .and_then(|p| p.upgrade())
+        .map(|p| p.borrow().style().clone())
+        .unwrap_or_default(),
+      HtmlNode::Text(t) => t
+        .parent
+        .as_ref()
+        .and_then(|p| p.upgrade())
+        .map(|p| p.borrow().style().clone())
+        .unwrap_or_default(),
     };
 
+    // 2. Apply Inherited Properties (Base Priority: 0)
     for (prop, default_val) in &inherited {
-      if let Some(parent_val) = parent_styles.get(*prop) {
-        node
-          .style_mut()
-          .insert(prop.to_string(), parent_val.clone());
-      } else {
-        node
-          .style_mut()
-          .insert(prop.to_string(), default_val.to_string());
-      }
+      let val = parent_styles
+        .get(*prop)
+        .cloned()
+        .unwrap_or_else(|| default_val.to_string());
+      node.style_mut().insert(prop.to_string(), val);
+      priority_tracker.insert(prop.to_string(), 0);
     }
 
+    // 3. Apply CSS Rules with Priority Matching
     for rule in rules {
       if rule.selector.matches(&*node) {
-        for (prop, val) in &rule.properties {
-          node.style_mut().insert(prop.clone(), val.clone());
+        for (prop, prop_val) in &rule.properties {
+          // Calculate effective priority: base + 10,000 if !important
+          let mut effective_priority = rule.priority;
+          if prop_val.important {
+            effective_priority += 10000;
+          }
+
+          let should_insert = match priority_tracker.get(prop) {
+            Some(&existing_prio) => effective_priority >= existing_prio,
+            None => true,
+          };
+
+          if should_insert {
+            priority_tracker.insert(prop.clone(), effective_priority);
+            node
+              .style_mut()
+              .insert(prop.clone(), prop_val.value.clone());
+          }
         }
       }
     }
 
+    // 4. Apply Inline Styles (Highest base priority: 1000)
     if let HtmlNode::Element(e) = &*node {
       if let Some(inline_style) = e.attributes.get("style") {
         let mut parser = CSSParser::new(inline_style);
-        for (prop, val) in parser.body() {
-          node.style_mut().insert(prop, val);
+        for (prop, prop_val) in parser.body() {
+          let mut effective_priority = 1000; // Inline starts higher than ID
+          if prop_val.important {
+            effective_priority += 10000;
+          }
+
+          let should_insert = match priority_tracker.get(&prop) {
+            Some(&existing_prio) => effective_priority >= existing_prio,
+            None => true,
+          };
+
+          if should_insert {
+            priority_tracker.insert(prop.clone(), effective_priority);
+            node.style_mut().insert(prop, prop_val.value);
+          }
         }
       }
     }
 
-    let font_size = node
-      .style_mut()
-      .get("font-size")
-      .cloned()
-      .unwrap_or_default();
+    // 5. Resolve Relative Font Sizes (%)
+    let font_size = node.style().get("font-size").cloned().unwrap_or_default();
     if font_size.ends_with('%') {
-      let parent_font_size = if !parent_styles.is_empty() {
-        parent_styles
-          .get("font-size")
-          .cloned()
-          .unwrap_or_else(|| inherited["font-size"].to_string())
-      } else {
-        inherited["font-size"].to_string()
-      };
+      let parent_font_size = parent_styles
+        .get("font-size")
+        .cloned()
+        .unwrap_or_else(|| inherited["font-size"].to_string());
 
       if let (Ok(pct), true) = (
         font_size.trim_end_matches('%').parse::<f32>(),
         parent_font_size.ends_with("px"),
       ) {
         if let Ok(parent_px) = parent_font_size.trim_end_matches("px").parse::<f32>() {
-          let resolved = pct / 100.0 * parent_px;
+          let resolved = (pct / 100.0) * parent_px;
           node
             .style_mut()
             .insert("font-size".to_string(), format!("{}px", resolved));
@@ -96,12 +110,10 @@ pub fn style(node_rc: &Rc<RefCell<HtmlNode>>, rules: &[Rule]) {
     }
   }
 
-  let children: Vec<Rc<RefCell<HtmlNode>>> = {
-    let node = node_rc.borrow();
-    node.children().iter().map(|c| Rc::clone(c)).collect()
-  };
-
-  for child in &children {
-    style(child, rules);
+  // 6. Recurse to children
+  let children: Vec<Rc<RefCell<HtmlNode>>> =
+    node_rc.borrow().children().iter().map(Rc::clone).collect();
+  for child in children {
+    style(&child, rules);
   }
 }
