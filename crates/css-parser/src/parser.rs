@@ -128,8 +128,16 @@ impl CSSParser {
 
       match self.pair() {
         Ok((prop, val)) => {
-          pairs.insert(prop, val);
+          if prop == "font" {
+            for (p, v) in self.expand_font_shorthand(&val) {
+              pairs.insert(p, v);
+            }
+          } else {
+            pairs.insert(prop, val);
+          }
+          
           self.whitespace();
+          
           // consume the semicolon if present
           if self.i < self.s.len() && self.s[self.i] == ';' {
             self.i += 1;
@@ -254,5 +262,29 @@ impl CSSParser {
     }
 
     rules
+  }
+  
+  fn expand_font_shorthand(&self, value: &str) -> HashMap<String, String> {
+    let mut expanded = HashMap::new();
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    
+    for part in parts {
+      match part.to_lowercase().as_str() {
+        "italic" | "oblique" => {
+          expanded.insert("font-style".to_string(), part.to_string());
+        }
+        "bold" => {
+          expanded.insert("font-weight".to_string(), part.to_string());
+        }
+        p if p.contains('%') || p.contains("px") => {
+          expanded.insert("font-size".to_string(), part.to_string());
+        }
+        _ => {
+          expanded.insert("font-family".to_string(), part.to_string());
+        }
+      }
+    }
+    
+    expanded
   }
 }

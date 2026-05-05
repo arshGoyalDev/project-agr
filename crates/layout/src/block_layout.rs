@@ -257,11 +257,13 @@ impl BlockLayout {
       _ => Style::Normal,
     };
 
-    let size: f32 = style_map
+    let mut size: f32 = style_map
       .get("font-size")
       .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok())
       .map(|px| px * 0.75)
       .unwrap_or(12.0);
+    
+    size = size.max(1.0);
 
     let color = style_map
       .get("color")
