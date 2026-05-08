@@ -1,6 +1,11 @@
 use crate::display_list::DisplayList;
 use crate::text_layout::TextLayout;
 
+use html_parser::Node;
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
 pub struct LineLayout {
   pub x: f32,
   pub y: f32,
@@ -18,6 +23,18 @@ impl LineLayout {
       height,
       children,
     }
+  }
+
+  pub fn get_node(&self, x: f32, y: f32) -> Option<Rc<RefCell<Node>>> {
+    if y < self.y || y > self.y + self.height {
+      return None;
+    }
+    for word in &self.children {
+      if let Some(node) = word.get_node(x, y) {
+        return Some(node);
+      }
+    }
+    None
   }
 
   pub fn paint(&self, cmds: &mut DisplayList) {

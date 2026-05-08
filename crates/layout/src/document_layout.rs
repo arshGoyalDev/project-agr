@@ -40,16 +40,24 @@ impl DocumentLayout {
 
     let mut child = BlockLayout::new(Rc::clone(&self.node));
 
-    // Kick off the top-down layout pass
     child.layout(self.x, self.y, self.width, None, &mut self.font_cache);
 
     self.height = child.height;
     self.children.push(child);
   }
 
+  pub fn get_node(&self, x: f32, y: f32) -> Option<Rc<RefCell<Node>>> {
+    for child in &self.children {
+      if let Some(node) = child.get_node(x, y) {
+        return Some(node);
+      }
+    }
+    None
+  }
+
   pub fn paint(&self) -> DisplayList {
     let mut cmds = DisplayList::new();
-    // Kick off the recursive paint phase
+
     for child in &self.children {
       child.paint(&mut cmds);
     }

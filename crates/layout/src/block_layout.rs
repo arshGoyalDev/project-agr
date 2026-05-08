@@ -197,6 +197,27 @@ impl BlockLayout {
     }
   }
 
+  pub fn get_node(&self, x: f32, y: f32) -> Option<Rc<RefCell<Node>>> {
+    if x < self.x || x > self.x + self.width || y < self.y || y > self.y + self.height {
+      return None;
+    }
+    for child in &self.children {
+      match child {
+        LayoutChild::Block(b) => {
+          if let Some(node) = b.get_node(x, y) {
+            return Some(node);
+          }
+        }
+        LayoutChild::Line(l) => {
+          if let Some(node) = l.get_node(x, y) {
+            return Some(node);
+          }
+        }
+      }
+    }
+    Some(Rc::clone(&self.node)) // Fallback if clicking empty space in the block
+  }
+
   fn word(
     &mut self,
     node_rc: &Rc<RefCell<Node>>,
@@ -270,6 +291,8 @@ impl BlockLayout {
     {
       self.flush();
       self.current_line.push(TextLayout {
+        node: node_rc.clone(),
+        width: word_size.width,
         x: self.cursor_x,
         y: 0.0,
         word,
@@ -281,6 +304,8 @@ impl BlockLayout {
       self.cursor_x += word_size.width;
     } else {
       self.current_line.push(TextLayout {
+        node: node_rc.clone(),
+        width: word_size.width,
         x: if self.is_superscript {
           self.cursor_x + space_advance - space_size.width
         } else {

@@ -55,8 +55,6 @@ impl Browser {
       doc.layout(self.width);
 
       self.display_list = doc.paint();
-      // self.display_list = DisplayList::new();
-      // paint_tree_document(doc, &mut self.display_list);
 
       self.max_y = self.display_list.max_y();
     }
@@ -66,6 +64,57 @@ impl Browser {
     match message {
       Message::ScrollChanged(offset) => {
         self.scroll_offset = offset;
+        Task::none()
+      }
+
+      Message::Click(x, y) => {
+        let abs_x = x;
+        let abs_y = y + self.scroll_offset;
+
+        if let Some(doc) = &self.document {
+          if let Some(mut current_node) = doc.get_node(abs_x, abs_y) {
+            let mut clicked_href = None;
+
+            loop {
+              let parent_opt = {
+                let node_borrow = current_node.borrow();
+
+                if let Node::Element(e) = &*node_borrow {
+                  if e.tag == "a" {
+                    if let Some(href) = e.attributes.get("href") {
+                      clicked_href = Some(href.clone());
+                    }
+                  }
+                }
+
+                match &*node_borrow {
+                  Node::Element(e) => e.parent.as_ref().and_then(|w| w.upgrade()),
+                  Node::Text(t) => t.parent.as_ref().and_then(|w| w.upgrade()),
+                }
+              };
+
+              if clicked_href.is_some() {
+                break;
+              }
+
+              match parent_opt {
+                Some(parent) => current_node = parent,
+                None => break,
+              }
+            }
+
+            if let Some(href) = clicked_href {
+              println!("Clicked link! Redirecting to: {}", href);
+
+              let mut url_handler = URLHandler::default();
+              url_handler.init(self.current_url.clone(), false);
+
+              self.current_url = url_handler.resolve(&href);
+
+              return Task::done(Message::LoadUrl());
+            }
+          }
+        }
         Task::none()
       }
 
@@ -117,7 +166,6 @@ impl Browser {
           }
 
           rules.sort_by_key(|r| r.priority);
-          // rules.sort_by(|a, b| a.selector.priority().cmp(&b.selector.priority()));
 
           style(node, &rules);
         }
@@ -127,11 +175,12 @@ impl Browser {
           doc.layout(self.width);
 
           self.display_list = doc.paint();
-          // paint_tree_document(&doc, &mut self.display_list);
 
           self.max_y = self.display_list.max_y();
           self.document = Some(doc);
         }
+
+        self.scroll_offset = 0.0;
 
         Task::none()
       }

@@ -1,6 +1,11 @@
 use crate::message::Message;
+
+use iced::keyboard;
+use iced::mouse;
 use iced::widget::canvas;
+use iced::widget::canvas::event::{self, Event};
 use iced::{Color, Pixels, Point, Size};
+
 use layout::DisplayList;
 use layout::display_list::DrawCommand;
 
@@ -19,28 +24,28 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
     _state: &mut Self::State,
     event: canvas::Event,
     bounds: iced::Rectangle,
-    _cursor: iced::mouse::Cursor,
-  ) -> (canvas::event::Status, Option<Message>) {
+    cursor: iced::mouse::Cursor,
+  ) -> (event::Status, Option<Message>) {
     match event {
-      canvas::Event::Mouse(iced::mouse::Event::WheelScrolled { delta }) => match delta {
-        iced::mouse::ScrollDelta::Lines { y, .. } | iced::mouse::ScrollDelta::Pixels { y, .. } => {
+      Event::Mouse(mouse::Event::WheelScrolled { delta }) => match delta {
+        mouse::ScrollDelta::Lines { y, .. } | mouse::ScrollDelta::Pixels { y, .. } => {
           let total_content_height = self.max_y + 40.0;
           let scrollable_limit = (total_content_height - bounds.height).max(0.0);
           let clamped_offset = (self.scroll_offset - y * 20.0)
             .max(0.0)
             .min(scrollable_limit);
           (
-            canvas::event::Status::Captured,
+            event::Status::Captured,
             Some(Message::ScrollChanged(clamped_offset)),
           )
         }
       },
-      canvas::Event::Keyboard(iced::keyboard::Event::KeyPressed { key, .. }) => {
+      Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) => {
         let new_offset = match key {
-          iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowUp) => {
+          keyboard::Key::Named(keyboard::key::Named::ArrowUp) => {
             (self.scroll_offset - 20.0).max(0.0)
           }
-          iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown) => {
+          keyboard::Key::Named(keyboard::key::Named::ArrowDown) => {
             let total_content_height = self.max_y + 40.0;
             let scrollable_limit = (total_content_height - bounds.height).max(0.0);
             (self.scroll_offset + 20.0).min(scrollable_limit)
@@ -48,11 +53,20 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
           _ => self.scroll_offset,
         };
         (
-          canvas::event::Status::Captured,
+          event::Status::Captured,
           Some(Message::ScrollChanged(new_offset)),
         )
       }
-      _ => (canvas::event::Status::Ignored, None),
+      Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+        if let Some(cursor_position) = cursor.position_in(bounds) {
+          return (
+            event::Status::Captured,
+            Some(Message::Click(cursor_position.x, cursor_position.y)),
+          );
+        }
+        (event::Status::Ignored, None)
+      }
+      _ => (event::Status::Ignored, None),
     }
   }
 
