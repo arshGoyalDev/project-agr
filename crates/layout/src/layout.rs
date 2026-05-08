@@ -1,10 +1,4 @@
-use crate::block_layout::BlockLayout;
-use crate::display_list::DisplayList;
-use crate::document_layout::DocumentLayout;
-use html_parser::Node;
-
-use std::cell::RefCell;
-use std::rc::Rc;
+// use crate::display_list::DisplayList;
 
 pub const HSTEP: f32 = 9.0;
 pub const VSTEP: f32 = 15.0;
@@ -61,20 +55,6 @@ pub const BLOCK_ELEMENTS: &[&str] = &[
   "colgroup",
   "col",
 ];
-
-pub fn paint_tree(layout: &BlockLayout, display_list: &mut DisplayList) {
-  display_list.extend(&layout.paint());
-  for child in &layout.children {
-    paint_tree(child, display_list);
-  }
-}
-
-pub fn paint_tree_document(doc: &DocumentLayout, display_list: &mut DisplayList) {
-  // DocumentLayout.paint() returns nothing, go straight to children
-  for child in &doc.children {
-    paint_tree(child, display_list);
-  }
-}
 
 pub fn decode_entities(text: &str) -> String {
   let mut result = String::with_capacity(text.len());
@@ -147,22 +127,22 @@ pub fn decode_entities(text: &str) -> String {
   result
 }
 
-pub struct Layout {
-  pub display_list: DisplayList,
-  pub height: f32,
-}
+// pub struct Layout {
+//   pub display_list: DisplayList,
+//   pub height: f32,
+// }
 
-impl Layout {
-  pub fn new(tree: &Rc<RefCell<Node>>, width: f32) -> Self {
-    let mut doc = DocumentLayout::new(tree);
-    doc.layout(width);
+// impl Layout {
+//   pub fn new(tree: &Rc<RefCell<Node>>, width: f32) -> Self {
+//     let mut doc = DocumentLayout::new(tree);
+//     doc.layout(width);
 
-    let mut display_list = DisplayList::new();
-    paint_tree_document(&doc, &mut display_list);
+//     // let mut display_list = DisplayList::new();
+//     // paint_tree_document(&doc, &mut display_list);
 
-    Self {
-      height: doc.height,
-      display_list,
-    }
-  }
-}
+//     Self {
+//       height: doc.height,
+//       display_list,
+//     }
+//   }
+// }

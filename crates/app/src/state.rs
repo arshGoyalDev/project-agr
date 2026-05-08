@@ -3,7 +3,7 @@ use iced::{Element, Subscription, Task, window};
 
 use css_parser::{CSSParser, style};
 use html_parser::{HTMLParser, Node};
-use layout::{DisplayList, DocumentLayout, paint_tree_document, syntax_highlight};
+use layout::{DisplayList, DocumentLayout, syntax_highlight};
 use net::URLHandler;
 use ui::{BrowserCanvas, Message};
 
@@ -54,8 +54,9 @@ impl Browser {
     if let Some(doc) = &mut self.document {
       doc.layout(self.width);
 
-      self.display_list = DisplayList::new();
-      paint_tree_document(doc, &mut self.display_list);
+      self.display_list = doc.paint();
+      // self.display_list = DisplayList::new();
+      // paint_tree_document(doc, &mut self.display_list);
 
       self.max_y = self.display_list.max_y();
     }
@@ -125,8 +126,8 @@ impl Browser {
           let mut doc = DocumentLayout::new(node);
           doc.layout(self.width);
 
-          self.display_list = DisplayList::new();
-          paint_tree_document(&doc, &mut self.display_list);
+          self.display_list = doc.paint();
+          // paint_tree_document(&doc, &mut self.display_list);
 
           self.max_y = self.display_list.max_y();
           self.document = Some(doc);
