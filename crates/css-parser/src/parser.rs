@@ -114,7 +114,6 @@ impl CSSParser {
     self.literal(':')?;
     self.whitespace();
 
-    // Use the new helper to check for !important
     let val = self.property_value_with_important()?;
     Ok((prop.to_lowercase(), val))
   }
@@ -131,7 +130,6 @@ impl CSSParser {
       match self.pair() {
         Ok((prop, val)) => {
           if prop == "font" {
-            // Expand shorthand while preserving the important flag
             for (p, v) in self.expand_font_shorthand(&val.value) {
               pairs.insert(
                 p,
@@ -236,7 +234,7 @@ impl CSSParser {
               let priority = selector.priority();
               rules.push(Rule {
                 selector,
-                properties: properties.clone(), // This now clones PropertyValues
+                properties: properties.clone(),
                 priority,
               });
             }

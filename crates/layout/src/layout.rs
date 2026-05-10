@@ -1,4 +1,3 @@
-// use crate::display_list::DisplayList;
 
 pub const HSTEP: f32 = 9.0;
 pub const VSTEP: f32 = 15.0;
@@ -126,23 +125,3 @@ pub fn decode_entities(text: &str) -> String {
 
   result
 }
-
-// pub struct Layout {
-//   pub display_list: DisplayList,
-//   pub height: f32,
-// }
-
-// impl Layout {
-//   pub fn new(tree: &Rc<RefCell<Node>>, width: f32) -> Self {
-//     let mut doc = DocumentLayout::new(tree);
-//     doc.layout(width);
-
-//     // let mut display_list = DisplayList::new();
-//     // paint_tree_document(&doc, &mut display_list);
-
-//     Self {
-//       height: doc.height,
-//       display_list,
-//     }
-//   }
-// }

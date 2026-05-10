@@ -215,7 +215,7 @@ impl BlockLayout {
         }
       }
     }
-    Some(Rc::clone(&self.node)) // Fallback if clicking empty space in the block
+    Some(Rc::clone(&self.node)) 
   }
 
   fn word(

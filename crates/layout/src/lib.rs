@@ -8,5 +8,4 @@ pub mod text_layout;
 
 pub use display_list::DisplayList;
 pub use document_layout::DocumentLayout;
-// pub use layout::Layout;
 pub use syntax_highlight::syntax_highlight;

@@ -1,5 +1,6 @@
 mod state;
 mod tab;
+mod window_controls;
 
 use iced::window;
 use state::Browser;

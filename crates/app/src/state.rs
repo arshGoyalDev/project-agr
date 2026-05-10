@@ -1,4 +1,5 @@
 use crate::tab::Tab;
+use crate::window_controls::window_controls;
 
 use iced::widget::{
   Button, Canvas, Column, Container, MouseArea, Row, Space, Text, TextInput, button,
@@ -50,7 +51,6 @@ impl Browser {
     window::resize_events().map(|(_id, size)| Message::WindowResized(size.width, size.height))
   }
 
-  // Helper functions to grab the active tab easily
   fn active_tab_mut(&mut self) -> &mut Tab {
     &mut self.tabs[self.active_tab_index]
   }
@@ -139,7 +139,6 @@ impl Browser {
         let abs_y = y + offset;
 
         if let Some(doc) = &self.active_tab().document {
-          // Using get_node based on your previous code upload
           if let Some(mut current_node) = doc.get_node(abs_x, abs_y) {
             let mut clicked_href = None;
 
@@ -173,7 +172,6 @@ impl Browser {
             if let Some(href) = clicked_href {
               println!("Clicked link! Redirecting to: {}", href);
               let mut url_handler = URLHandler::default();
-              // Resolve the URL relative to the CURRENT tab's URL
               url_handler.init(self.active_tab().url.clone(), false);
               let resolved_url = url_handler.resolve(&href);
               return Task::done(Message::NavigateTo(resolved_url));
@@ -240,7 +238,6 @@ impl Browser {
           style(node, &rules);
         }
 
-        // 3. Layout and assign back to the Active Tab
         let tab = self.active_tab_mut();
         tab.tree = new_tree;
 
@@ -271,7 +268,7 @@ impl Browser {
     let can_go_back = active_tab.history_index > 0;
     let can_go_forward = active_tab.history_index + 1 < active_tab.history.len();
 
-    // 1. Build Tab Bar (Left side)
+    // Tab Bar (Left side)
     let mut tab_row = Row::new().spacing(2).align_y(iced::Alignment::Center);
     for (i, tab) in self.tabs.iter().enumerate() {
       let label = if i == self.active_tab_index {
@@ -303,37 +300,24 @@ impl Browser {
         .style(button::text),
     );
 
-    // NEW: Build Window Controls (Right side)
-    let window_controls = Row::new()
-      .spacing(5)
-      .align_y(iced::Alignment::Center)
-      .push(
-        Button::new(Text::new("_"))
-          .on_press(Message::MinimizeWindow)
-          .style(button::text).align_y(iced::Alignment::Center),
-      )
-      .push(
-        Button::new(Text::new("□"))
-          .on_press(Message::ToggleMaximizeWindow)
-          .style(button::text),
-      )
-      .push(
-        Button::new(Text::new("X"))
-          .on_press(Message::CloseWindow)
-          .style(button::text),
-      );
+    // Build Window Controls (Right side)
+    let window_controls = window_controls(
+      Message::MinimizeWindow,
+      Message::ToggleMaximizeWindow,
+      Message::CloseWindow,
+    );
 
-    // NEW: Combine Tabs, a flexible Space, and Window Controls
+    // Combine Tabs, a flexible Space, and Window Controls
     let title_bar_content = Row::new()
       .align_y(iced::Alignment::Center)
       .push(tab_row)
-      .push(Space::with_width(Length::Fill)) // Pushes controls to the far right!
+      .push(Space::with_width(Length::Fill))
       .push(window_controls);
 
-    // NEW: Wrap in MouseArea to detect dragging
+    // Wrap in MouseArea to detect dragging
     let draggable_title_bar = MouseArea::new(title_bar_content).on_press(Message::TitleBarPressed);
 
-    // UPDATED: Wrap the MouseArea in the dark Container
+    // Wrap the MouseArea in the dark Container
     let title_bar = Container::new(draggable_title_bar)
       .width(Length::Fill)
       .padding(8)
@@ -342,7 +326,7 @@ impl Browser {
         ..Default::default()
       });
 
-    // 2. Build Address Bar Buttons
+    // Address Bar Buttons
     let mut back_btn = Button::new(Text::new("<")).style(button::text);
     if can_go_back {
       back_btn = back_btn.on_press(Message::GoBack);
@@ -353,7 +337,7 @@ impl Browser {
       forward_btn = forward_btn.on_press(Message::GoForward);
     }
 
-    // 3. Build Address Bar
+    // Address Bar
     let address_bar = Row::new()
       .spacing(10)
       .padding(5)
@@ -365,7 +349,7 @@ impl Browser {
           .on_submit(Message::NavigateTo(self.address_bar_text.clone())),
       );
 
-    // 4. Build Web Content Canvas
+    // Web Content Canvas
     let browser_canvas = BrowserCanvas {
       display_list: &active_tab.display_list,
       scroll_offset: active_tab.scroll_offset,
@@ -377,7 +361,7 @@ impl Browser {
       .width(Length::Fill)
       .height(Length::Fill);
 
-    // 5. Combine into final layout
+    // Final layout
     Column::new()
       .push(title_bar)
       .push(address_bar)

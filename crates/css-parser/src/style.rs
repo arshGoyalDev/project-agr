@@ -14,7 +14,6 @@ pub fn style(node_rc: &Rc<RefCell<HtmlNode>>, rules: &[Rule]) {
   {
     let mut node = node_rc.borrow_mut();
 
-    // 1. Get Parent Styles for Inheritance
     let parent_styles: HashMap<String, String> = match &*node {
       HtmlNode::Element(e) => e
         .parent
@@ -30,7 +29,6 @@ pub fn style(node_rc: &Rc<RefCell<HtmlNode>>, rules: &[Rule]) {
         .unwrap_or_default(),
     };
 
-    // 2. Apply Inherited Properties (Base Priority: 0)
     for (prop, default_val) in &inherited {
       let val = parent_styles
         .get(*prop)
@@ -40,11 +38,9 @@ pub fn style(node_rc: &Rc<RefCell<HtmlNode>>, rules: &[Rule]) {
       priority_tracker.insert(prop.to_string(), 0);
     }
 
-    // 3. Apply CSS Rules with Priority Matching
     for rule in rules {
       if rule.selector.matches(&*node) {
         for (prop, prop_val) in &rule.properties {
-          // Calculate effective priority: base + 10,000 if !important
           let mut effective_priority = rule.priority;
           if prop_val.important {
             effective_priority += 10000;
@@ -70,7 +66,7 @@ pub fn style(node_rc: &Rc<RefCell<HtmlNode>>, rules: &[Rule]) {
       if let Some(inline_style) = e.attributes.get("style") {
         let mut parser = CSSParser::new(inline_style);
         for (prop, prop_val) in parser.body() {
-          let mut effective_priority = 1000; // Inline starts higher than ID
+          let mut effective_priority = 1000;
           if prop_val.important {
             effective_priority += 10000;
           }
@@ -88,7 +84,6 @@ pub fn style(node_rc: &Rc<RefCell<HtmlNode>>, rules: &[Rule]) {
       }
     }
 
-    // 5. Resolve Relative Font Sizes (%)
     let font_size = node.style().get("font-size").cloned().unwrap_or_default();
     if font_size.ends_with('%') {
       let parent_font_size = parent_styles
@@ -110,7 +105,6 @@ pub fn style(node_rc: &Rc<RefCell<HtmlNode>>, rules: &[Rule]) {
     }
   }
 
-  // 6. Recurse to children
   let children: Vec<Rc<RefCell<HtmlNode>>> =
     node_rc.borrow().children().iter().map(Rc::clone).collect();
   for child in children {
