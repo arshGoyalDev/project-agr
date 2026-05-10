@@ -215,7 +215,7 @@ impl BlockLayout {
         }
       }
     }
-    Some(Rc::clone(&self.node)) 
+    Some(Rc::clone(&self.node))
   }
 
   fn word(

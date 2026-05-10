@@ -9,14 +9,14 @@ use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct TextLayout {
-  pub node: Rc<RefCell<Node>>, 
+  pub node: Rc<RefCell<Node>>,
   pub word: String,
   pub font: Font,
   pub size: f32,
   pub color: Color,
   pub x: f32,
   pub y: f32,
-  pub width: f32, 
+  pub width: f32,
   pub is_superscript: bool,
 }
 

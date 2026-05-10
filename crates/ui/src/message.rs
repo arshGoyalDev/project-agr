@@ -14,4 +14,7 @@ pub enum Message {
   MinimizeWindow,
   ToggleMaximizeWindow,
   CloseWindow,
+  CloseTab(usize),
+  TabHovered(usize),
+  TabUnhovered,
 }

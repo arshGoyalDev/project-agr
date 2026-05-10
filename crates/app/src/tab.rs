@@ -13,6 +13,7 @@ pub struct Tab {
   pub display_list: DisplayList,
   pub scroll_offset: f32,
   pub max_y: f32,
+  pub title: String,
 }
 
 impl Tab {
@@ -26,6 +27,7 @@ impl Tab {
       display_list: DisplayList::new(),
       scroll_offset: 0.0,
       max_y: 0.0,
+      title: String::new(),
     }
   }
 }
