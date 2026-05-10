@@ -1,6 +1,6 @@
 use crate::block_layout::{BlockLayout, FontKey};
 use crate::display_list::DisplayList;
-use crate::layout::{HSTEP, VSTEP};
+// use crate::layout::{HSTEP, VSTEP};
 
 use html_parser::Node;
 use iced::font::Font;
@@ -24,8 +24,8 @@ impl DocumentLayout {
     Self {
       node: Rc::clone(node),
       children: vec![],
-      x: HSTEP,
-      y: VSTEP,
+      x: 0.0,
+      y: 0.0,
       width: 0.0,
       height: 0.0,
       font_cache: HashMap::new(),
@@ -34,9 +34,9 @@ impl DocumentLayout {
 
   pub fn layout(&mut self, browser_width: f32) {
     self.children.clear();
-    self.width = browser_width - 2.0 * HSTEP;
-    self.x = HSTEP;
-    self.y = VSTEP;
+    self.width = browser_width;
+    self.x = 0.0;
+    self.y = 0.0;
 
     let mut child = BlockLayout::new(Rc::clone(&self.node));
 
