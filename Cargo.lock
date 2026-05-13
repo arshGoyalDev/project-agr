@@ -34,7 +34,6 @@ dependencies = [
  "layout",
  "net",
  "tokio",
- "ui",
 ]
 
 [[package]]
@@ -3493,14 +3492,6 @@ dependencies = [
  "memoffset",
  "tempfile",
  "winapi",
-]
-
-[[package]]
-name = "ui"
-version = "0.1.0"
-dependencies = [
- "iced",
- "layout",
 ]
 
 [[package]]
