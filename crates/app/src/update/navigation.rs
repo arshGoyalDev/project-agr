@@ -1,6 +1,6 @@
 use crate::browser::Browser;
 use crate::message::Message;
-use crate::net::{fetch_html_task};
+use crate::net::fetch_html_task;
 use iced::Task;
 
 pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
@@ -50,7 +50,10 @@ pub fn load_url(browser: &mut Browser, tab_index: usize, url: String) -> Task<Me
     tab.display_list = layout::DisplayList::new();
   }
 
-  Task::perform(fetch_html_task(url), move |(base_url, is_view_source, result)| {
-    Message::HtmlFetched(tab_index, base_url, is_view_source, result)
-  })
+  Task::perform(
+    fetch_html_task(url),
+    move |(base_url, is_view_source, result)| {
+      Message::HtmlFetched(tab_index, base_url, is_view_source, result)
+    },
+  )
 }

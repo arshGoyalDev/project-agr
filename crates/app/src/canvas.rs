@@ -4,7 +4,7 @@ use iced::keyboard;
 use iced::mouse;
 use iced::widget::canvas;
 use iced::widget::canvas::event::{self, Event};
-use iced::{Color, Pixels, Point, Size};
+use iced::{Pixels, Point, Size};
 
 use layout::DisplayList;
 use layout::display_list::DrawCommand;
@@ -27,19 +27,21 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
     cursor: iced::mouse::Cursor,
   ) -> (event::Status, Option<Message>) {
     match event {
-      Event::Mouse(mouse::Event::WheelScrolled { delta }) => match delta {
-        mouse::ScrollDelta::Lines { y, .. } | mouse::ScrollDelta::Pixels { y, .. } => {
-          let total_content_height = self.max_y + 40.0;
-          let scrollable_limit = (total_content_height - bounds.height).max(0.0);
-          let clamped_offset = (self.scroll_offset - y * 20.0)
-            .max(0.0)
-            .min(scrollable_limit);
-          (
-            event::Status::Captured,
-            Some(Message::ScrollChanged(clamped_offset)),
-          )
-        }
-      },
+      Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
+        let scroll_amount = match delta {
+          mouse::ScrollDelta::Lines { y, .. } => y * 1000.0,
+          mouse::ScrollDelta::Pixels { y, .. } => y * 10.0,
+        };
+
+        let max_scroll = (self.max_y - bounds.height).max(0.0);
+
+        let new_offset = (self.scroll_offset - scroll_amount).clamp(0.0, max_scroll);
+
+        (
+          iced::widget::canvas::event::Status::Captured,
+          Some(Message::ScrollChanged(new_offset)),
+        )
+      }
       Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) => {
         let new_offset = match key {
           keyboard::Key::Named(keyboard::key::Named::ArrowUp) => {
@@ -110,19 +112,17 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
       }
     }
 
-    if self.max_y > 0.0 {
-      let view_ratio = self.height / self.max_y;
-      let bar_height = self.height * view_ratio;
+    if self.max_y > bounds.height {
+      let view_ratio = bounds.height / self.max_y;
+      let bar_height = (bounds.height * view_ratio).max(20.0);
       let scroll_ratio = self.scroll_offset / self.max_y;
-      let bar_top = self.height * scroll_ratio;
+      let bar_top = bounds.height * scroll_ratio;
 
-      if bar_top.is_finite() && bar_height.is_finite() {
-        let scrollbar = canvas::Path::rectangle(
-          Point::new(bounds.width - 10.0, bar_top),
-          Size::new(10.0, bar_height),
-        );
-        frame.fill(&scrollbar, Color::BLACK);
-      }
+      frame.fill_rectangle(
+        iced::Point::new(bounds.width - 12.0, bar_top),
+        iced::Size::new(10.0, bar_height),
+        iced::Color::from_rgba8(100, 100, 100, 0.5),
+      );
     }
 
     vec![frame.into_geometry()]
