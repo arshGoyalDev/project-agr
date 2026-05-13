@@ -45,7 +45,7 @@ impl Browser {
         width: 800.0,
         height: 600.0,
       },
-      Task::done(Message::LoadUrl(url)),
+      Task::done(Message::LoadUrl(0, url)),
     )
   }
 
@@ -106,7 +106,7 @@ impl Browser {
           // If closing the last tab, replace it with a blank one
           self.tabs[0] = Tab::new("about:blank".to_string());
           self.address_bar_text = "about:blank".to_string();
-          Task::done(Message::LoadUrl("about:blank".to_string()))
+          Task::done(Message::LoadUrl(0, "about:blank".to_string()))
         }
       }
 
@@ -114,7 +114,7 @@ impl Browser {
         self.tabs.push(Tab::new("about:blank".to_string()));
         self.active_tab_index = self.tabs.len() - 1;
         self.address_bar_text = "about:blank".to_string();
-        Task::done(Message::LoadUrl("about:blank".to_string()))
+        Task::done(Message::LoadUrl(self.active_tab_index, "about:blank".to_string()))
       }
       Message::SwitchTab(index) => {
         if index < self.tabs.len() {
@@ -133,7 +133,7 @@ impl Browser {
           tab.history_index = tab.history.len() - 1;
         }
 
-        Task::done(Message::LoadUrl(url))
+        Task::done(Message::LoadUrl(self.active_tab_index, url))
       }
       Message::GoBack => {
         let tab = self.active_tab_mut();
@@ -141,7 +141,7 @@ impl Browser {
         if tab.history_index > 0 {
           tab.history_index -= 1;
           let prev_url = tab.history[tab.history_index].clone();
-          return Task::done(Message::LoadUrl(prev_url));
+          return Task::done(Message::LoadUrl(self.active_tab_index, prev_url));
         }
 
         Task::none()
@@ -152,7 +152,7 @@ impl Browser {
         if tab.history_index + 1 < tab.history.len() {
           tab.history_index += 1;
           let next_url = tab.history[tab.history_index].clone();
-          return Task::done(Message::LoadUrl(next_url));
+          return Task::done(Message::LoadUrl(self.active_tab_index, next_url));
         }
 
         Task::none()
@@ -212,86 +212,183 @@ impl Browser {
         }
         Task::none()
       }
-      Message::LoadUrl(url) => {
-        let width = self.width;
-
-        self.address_bar_text = url.clone();
-
-        {
-          let tab = self.active_tab_mut();
+      Message::LoadUrl(tab_index, url) => {
+        if let Some(tab) = self.tabs.get_mut(tab_index) {
           tab.url = url.clone();
-          tab.title = String::new(); // Reset title while loading
-        }
-
-        let mut url_handler = URLHandler::default();
-        url_handler.init(url.clone(), false);
-        let body_result = url_handler.request();
-
-        let mut new_tree = None;
-        if let Ok(value) = body_result {
-          let mut html_parser = HTMLParser::new(value);
-          new_tree = Some(html_parser.parse());
-        }
-
-        // View Source support
-        if url_handler.view_source {
-          if let Some(node) = &new_tree {
-            let highlighted = syntax_highlight(node);
-            let mut html_parser = HTMLParser::new(highlighted);
-            new_tree = Some(html_parser.parse());
+          if tab_index == self.active_tab_index {
+            self.address_bar_text = url.clone();
           }
+          tab.title = String::from("Loading...");
+
+          // Clear the canvas visually while loading
+          tab.display_list = layout::DisplayList::new();
         }
 
-        // CSS Styling
-        if let Some(node) = &new_tree {
-          let default_css = include_str!("../../../browser.css").to_string();
-          let mut css_parser = CSSParser::new(&default_css);
-          let mut rules = css_parser.parse();
+        // Send the network request to the background!
+        Task::perform(
+          fetch_html_task(url),
+          move |(base_url, is_view_source, result)| {
+            Message::HtmlFetched(tab_index, base_url, is_view_source, result)
+          },
+        )
+      }
 
-          let mut links = Vec::new();
-          find_stylesheet_links(node, &mut links);
+      Message::HtmlFetched(tab_index, base_url, is_view_source, result) => {
+        if let Some(tab) = self.tabs.get_mut(tab_index) {
+          if let Ok(body) = result {
+            let mut html_parser = HTMLParser::new(body);
+            let mut tree = html_parser.parse();
 
-          for link in links {
-            let resolved_url = url_handler.resolve(&link);
-            let mut style_handler = URLHandler::default();
-            style_handler.init(resolved_url, false);
-
-            if let Ok(css_body) = style_handler.request() {
-              let mut linked_parser = CSSParser::new(&css_body);
-              rules.extend(linked_parser.parse());
+            // Handle view-source
+            if is_view_source {
+              let highlighted = syntax_highlight(&tree);
+              tree = HTMLParser::new(highlighted).parse();
             }
-          }
 
-          let mut inline_style_texts = Vec::new();
-          find_inline_styles(node, &mut inline_style_texts);
-          for css_text in inline_style_texts {
-            rules.extend(CSSParser::new(&css_text).parse());
-          }
+            let mut links = Vec::new();
+            find_stylesheet_links(&tree, &mut links);
 
-          rules.sort_by_key(|r| r.priority);
-          style(node, &rules);
+            tab.tree = Some(tree);
+
+            if links.is_empty() {
+              // No CSS to fetch, immediately go to the next step
+              return Task::done(Message::CssFetched(tab_index, vec![]));
+            } else {
+              // Fetch CSS in the background!
+              return Task::perform(fetch_css_task(links, base_url), move |bodies| {
+                Message::CssFetched(tab_index, bodies)
+              });
+            }
+          } else {
+            tab.title = String::from("Network Error");
+          }
         }
-
-        let tab = self.active_tab_mut();
-        tab.tree = new_tree;
-
-        if let Some(node) = &tab.tree {
-          // NEW: Extract Title from the HTML Tree
-          if let Some(title) = extract_title(node) {
-            tab.title = title;
-          }
-
-          let mut doc = DocumentLayout::new(node);
-          doc.layout(width);
-
-          tab.display_list = doc.paint();
-          tab.max_y = tab.display_list.max_y();
-          tab.document = Some(doc);
-        }
-
-        tab.scroll_offset = 0.0;
         Task::none()
       }
+
+      Message::CssFetched(tab_index, css_bodies) => {
+        let width = self.width;
+        if let Some(tab) = self.tabs.get_mut(tab_index) {
+          if let Some(tree) = &tab.tree {
+            let default_css = include_str!("../../../browser.css").to_string();
+            let mut css_parser = CSSParser::new(&default_css);
+            let mut rules = css_parser.parse();
+
+            // 1. Add downloaded CSS
+            for body in css_bodies {
+              let mut linked_parser = CSSParser::new(&body);
+              rules.extend(linked_parser.parse());
+            }
+
+            // 2. Add inline styles
+            let mut inline_style_texts = Vec::new();
+            find_inline_styles(tree, &mut inline_style_texts);
+            for css_text in inline_style_texts {
+              rules.extend(CSSParser::new(&css_text).parse());
+            }
+
+            rules.sort_by_key(|r| r.priority);
+            style(tree, &rules);
+
+            // Set title
+            if let Some(title) = extract_title(tree) {
+              tab.title = title;
+            } else {
+              tab.title = tab.url.clone();
+            }
+
+            // Layout & Paint!
+            let mut doc = DocumentLayout::new(tree);
+            doc.layout(width);
+
+            tab.display_list = doc.paint();
+            tab.max_y = tab.display_list.max_y();
+            tab.document = Some(doc);
+            tab.scroll_offset = 0.0;
+          }
+        }
+        Task::none()
+      }
+      // Message::LoadUrl(url) => {
+      //   let width = self.width;
+
+      //   self.address_bar_text = url.clone();
+
+      //   {
+      //     let tab = self.active_tab_mut();
+      //     tab.url = url.clone();
+      //     tab.title = String::new(); // Reset title while loading
+      //   }
+
+      //   let mut url_handler = URLHandler::default();
+      //   url_handler.init(url.clone(), false);
+      //   let body_result = url_handler.request();
+
+      //   let mut new_tree = None;
+      //   if let Ok(value) = body_result {
+      //     let mut html_parser = HTMLParser::new(value);
+      //     new_tree = Some(html_parser.parse());
+      //   }
+
+      //   // View Source support
+      //   if url_handler.view_source {
+      //     if let Some(node) = &new_tree {
+      //       let highlighted = syntax_highlight(node);
+      //       let mut html_parser = HTMLParser::new(highlighted);
+      //       new_tree = Some(html_parser.parse());
+      //     }
+      //   }
+
+      //   // CSS Styling
+      //   if let Some(node) = &new_tree {
+      //     let default_css = include_str!("../../../browser.css").to_string();
+      //     let mut css_parser = CSSParser::new(&default_css);
+      //     let mut rules = css_parser.parse();
+
+      //     let mut links = Vec::new();
+      //     find_stylesheet_links(node, &mut links);
+
+      //     for link in links {
+      //       let resolved_url = url_handler.resolve(&link);
+      //       let mut style_handler = URLHandler::default();
+      //       style_handler.init(resolved_url, false);
+
+      //       if let Ok(css_body) = style_handler.request() {
+      //         let mut linked_parser = CSSParser::new(&css_body);
+      //         rules.extend(linked_parser.parse());
+      //       }
+      //     }
+
+      //     let mut inline_style_texts = Vec::new();
+      //     find_inline_styles(node, &mut inline_style_texts);
+      //     for css_text in inline_style_texts {
+      //       rules.extend(CSSParser::new(&css_text).parse());
+      //     }
+
+      //     rules.sort_by_key(|r| r.priority);
+      //     style(node, &rules);
+      //   }
+
+      //   let tab = self.active_tab_mut();
+      //   tab.tree = new_tree;
+
+      //   if let Some(node) = &tab.tree {
+      //     // NEW: Extract Title from the HTML Tree
+      //     if let Some(title) = extract_title(node) {
+      //       tab.title = title;
+      //     }
+
+      //     let mut doc = DocumentLayout::new(node);
+      //     doc.layout(width);
+
+      //     tab.display_list = doc.paint();
+      //     tab.max_y = tab.display_list.max_y();
+      //     tab.document = Some(doc);
+      //   }
+
+      //   tab.scroll_offset = 0.0;
+      //   Task::none()
+      // }
       Message::WindowResized(width, height) => {
         self.width = width;
         self.height = height;
@@ -637,4 +734,34 @@ pub fn parse_css_color(s: &str) -> Option<iced::Color> {
     ));
   }
   None
+}
+
+// Runs in the background to fetch the main HTML
+pub async fn fetch_html_task(url: String) -> (String, bool, Result<String, String>) {
+  let mut handler = net::URLHandler::default();
+  handler.init(url.clone(), false);
+
+  match handler.request() {
+    Ok(body) => (url, handler.view_source, Ok(body)),
+    Err(_) => (url, handler.view_source, Err("Network Error".to_string())),
+  }
+}
+
+// Runs in the background to fetch all CSS stylesheets
+pub async fn fetch_css_task(links: Vec<String>, base_url: String) -> Vec<String> {
+  let mut css_bodies = Vec::new();
+
+  for link in links {
+    let mut url_handler = net::URLHandler::default();
+    url_handler.init(base_url.clone(), false);
+    let resolved_url = url_handler.resolve(&link);
+
+    let mut style_handler = net::URLHandler::default();
+    style_handler.init(resolved_url, false);
+
+    if let Ok(css_body) = style_handler.request() {
+      css_bodies.push(css_body);
+    }
+  }
+  css_bodies
 }
