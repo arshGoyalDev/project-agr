@@ -151,6 +151,19 @@ impl Browser {
       forward_btn = forward_btn.on_press(Message::GoForward);
     }
 
+    let is_bookmarked = self.bookmarks.contains(&active_tab.url);
+    let bookmark_btn = Button::new(
+      Text::new(if is_bookmarked { "★" } else { "☆" })
+        .size(18.0)
+        .color(if is_bookmarked {
+          Color::from_rgb8(255, 215, 0)
+        } else {
+          Color::WHITE
+        }),
+    )
+    .style(button::text)
+    .on_press(Message::ToggleBookmark);
+
     let address_bar = Row::new()
       .spacing(10)
       .padding(5)
@@ -160,14 +173,14 @@ impl Browser {
         TextInput::new("Enter URL...", &self.address_bar_text)
           .on_input(Message::AddressInputChanged)
           .on_submit(Message::NavigateTo(self.address_bar_text.clone())),
-      );
+      )
+      .push(bookmark_btn);
 
     // Canvas rendering
     let browser_canvas = BrowserCanvas {
       display_list: &active_tab.display_list,
       scroll_offset: active_tab.scroll_offset,
       max_y: active_tab.max_y,
-      height: self.height,
     };
 
     let content = Canvas::new(browser_canvas)

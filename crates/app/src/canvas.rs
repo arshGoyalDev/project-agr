@@ -13,7 +13,6 @@ pub struct BrowserCanvas<'a> {
   pub display_list: &'a DisplayList,
   pub scroll_offset: f32,
   pub max_y: f32,
-  pub height: f32,
 }
 
 impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {

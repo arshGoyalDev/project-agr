@@ -86,6 +86,19 @@ pub fn go_forward(browser: &mut Browser) -> Task<Message> {
   Task::none()
 }
 
+pub fn toggle_bookmark(browser: &mut Browser) -> Task<Message> {
+  let url = browser.tabs[browser.active_tab_index].url.clone();
+
+  if !url.is_empty() && url != "about:blank" {
+    if let Some(pos) = browser.bookmarks.iter().position(|x| x == &url) {
+      browser.bookmarks.remove(pos);
+    } else {
+      browser.bookmarks.push(url);
+    }
+  }
+  Task::none()
+}
+
 pub fn load_url(browser: &mut Browser, tab_index: usize, url: String) -> Task<Message> {
   if let Some(tab) = browser.tabs.get_mut(tab_index) {
     tab.url = url.clone();
@@ -94,6 +107,28 @@ pub fn load_url(browser: &mut Browser, tab_index: usize, url: String) -> Task<Me
     }
     tab.title = String::from("Loading...");
     tab.display_list = layout::DisplayList::new();
+  }
+
+  if url == "about:bookmarks" {
+    let mut html = String::from(
+      "<html><head><title>Bookmarks</title></head><body style=\"padding: 20px;\"><h1>My Bookmarks</h1><ul>",
+    );
+
+    if browser.bookmarks.is_empty() {
+      html.push_str("<li>No bookmarks saved yet!</li>");
+    } else {
+      for b in &browser.bookmarks {
+        html.push_str(&format!("<li><a href=\"{}\">{}</a></li>", b, b));
+      }
+    }
+    html.push_str("</ul></body></html>");
+
+    return Task::done(Message::HtmlFetched(
+      tab_index,
+      url.clone(),
+      false,
+      Ok(html),
+    ));
   }
 
   Task::perform(

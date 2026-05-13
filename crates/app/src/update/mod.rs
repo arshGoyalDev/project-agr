@@ -28,6 +28,7 @@ impl Browser {
       Message::SwitchTab(index) => tabs::switch_tab(self, index),
 
       // Navigation
+      Message::ToggleBookmark => navigation::toggle_bookmark(self),
       Message::NavigateTo(url) => navigation::navigate_to(self, url),
       Message::GoBack => navigation::go_back(self),
       Message::GoForward => navigation::go_forward(self),

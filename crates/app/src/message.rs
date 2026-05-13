@@ -20,4 +20,5 @@ pub enum Message {
   TabHovered(usize),
   TabUnhovered,
   ScrollToFragment(String),
+  ToggleBookmark,
 }

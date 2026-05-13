@@ -10,6 +10,7 @@ pub struct Browser {
   pub address_bar_text: String,
   pub width: f32,
   pub height: f32,
+  pub bookmarks: Vec<String>,
 }
 
 impl Browser {
@@ -29,6 +30,7 @@ impl Browser {
         address_bar_text: url.clone(),
         width: 800.0,
         height: 600.0,
+        bookmarks: Vec::new(),
       },
       Task::done(Message::LoadUrl(0, url)),
     )
