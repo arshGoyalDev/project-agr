@@ -55,6 +55,15 @@ impl DocumentLayout {
     None
   }
 
+  pub fn get_element_y(&self, id: &str) -> Option<f32> {
+    for child in &self.children {
+      if let Some(y) = child.get_element_y(id) {
+        return Some(y);
+      }
+    }
+    None
+  }
+
   pub fn paint(&self) -> DisplayList {
     let mut cmds = DisplayList::new();
 

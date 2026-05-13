@@ -19,4 +19,5 @@ pub enum Message {
   CloseTab(usize),
   TabHovered(usize),
   TabUnhovered,
+  ScrollToFragment(String),
 }

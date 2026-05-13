@@ -80,7 +80,17 @@ pub fn css_fetched(
       tab.display_list = doc.paint();
       tab.max_y = tab.display_list.max_y();
       tab.document = Some(doc);
-      tab.scroll_offset = 0.0;
+
+      if let Some(fragment) = tab.url.split('#').nth(1) {
+        if let Some(y_pos) = tab.document.as_ref().unwrap().get_element_y(fragment) {
+          let max_scroll = (tab.max_y - width).max(0.0);
+          tab.scroll_offset = y_pos.clamp(0.0, max_scroll);
+        } else {
+          tab.scroll_offset = 0.0;
+        }
+      } else {
+        tab.scroll_offset = 0.0;
+      }
     }
   }
 

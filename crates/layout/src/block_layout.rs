@@ -324,6 +324,29 @@ impl BlockLayout {
     self.needs_space = true;
   }
 
+  pub fn get_element_y(&self, id: &str) -> Option<f32> {
+    let node_borrow = self.node.borrow();
+    if let html_parser::Node::Element(e) = &*node_borrow {
+      if let Some(node_id) = e.attributes.get("id") {
+        if node_id == id {
+          return Some(self.y);
+        }
+      }
+    }
+
+    for child in &self.children {
+      match child {
+        LayoutChild::Block(b) => {
+          if let Some(y) = b.get_element_y(id) {
+            return Some(y);
+          }
+        }
+        _ => {}
+      }
+    }
+    None
+  }
+
   fn flush(&mut self) {
     if self.current_line.is_empty() {
       return;

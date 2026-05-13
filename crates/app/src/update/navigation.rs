@@ -4,16 +4,62 @@ use crate::net::fetch_html_task;
 use iced::Task;
 
 pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
-  let tab = &mut browser.tabs[browser.active_tab_index];
+  let active_tab = &browser.tabs[browser.active_tab_index];
+  let current_url = active_tab.url.clone();
 
+  // 1. Omnibox Heuristics (Requirement 7-6)
+  let final_url = if url.contains("://") || url.starts_with("about:") || url.starts_with("data:") {
+    url.clone()
+  } else if url.starts_with('#') {
+    let base = current_url.split('#').next().unwrap_or(&current_url);
+    format!("{}{}", base, url)
+  } else if url.contains('.') && !url.contains(' ') {
+    format!("https://{}", url)
+  } else {
+    let query = url.replace(' ', "+");
+    format!("https://google.com/search?q={}", query)
+  };
+
+  let current_base = current_url.split('#').next().unwrap_or(&current_url);
+  let new_base = final_url.split('#').next().unwrap_or(&final_url);
+
+  if current_base == new_base && final_url.contains('#') && active_tab.document.is_some() {
+    let fragment = final_url.split('#').nth(1).unwrap().to_string();
+
+    let tab = &mut browser.tabs[browser.active_tab_index];
+    tab.url = final_url.clone();
+    browser.address_bar_text = final_url.clone();
+
+    tab.history.truncate(tab.history_index + 1);
+    if tab.history.last() != Some(&final_url) {
+      tab.history.push(final_url);
+      tab.history_index = tab.history.len() - 1;
+    }
+
+    return Task::done(Message::ScrollToFragment(fragment));
+  }
+
+  let tab = &mut browser.tabs[browser.active_tab_index];
   tab.history.truncate(tab.history_index + 1);
 
-  if tab.history.last() != Some(&url) {
-    tab.history.push(url.clone());
+  if tab.history.last() != Some(&final_url) {
+    tab.history.push(final_url.clone());
     tab.history_index = tab.history.len() - 1;
   }
 
-  Task::done(Message::LoadUrl(browser.active_tab_index, url))
+  Task::done(Message::LoadUrl(browser.active_tab_index, final_url))
+}
+
+pub fn scroll_to_fragment(browser: &mut Browser, fragment: String) -> Task<Message> {
+  let tab = &mut browser.tabs[browser.active_tab_index];
+
+  if let Some(doc) = &tab.document {
+    if let Some(y_pos) = doc.get_element_y(&fragment) {
+      let max_scroll = (tab.max_y - browser.height).max(0.0);
+      tab.scroll_offset = y_pos.clamp(0.0, max_scroll);
+    }
+  }
+  Task::none()
 }
 
 pub fn go_back(browser: &mut Browser) -> Task<Message> {

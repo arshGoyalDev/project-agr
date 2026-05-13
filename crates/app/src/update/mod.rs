@@ -40,6 +40,7 @@ impl Browser {
       Message::CssFetched(tab_index, css_bodies) => {
         loading::css_fetched(self, tab_index, css_bodies)
       }
+      Message::ScrollToFragment(id) => navigation::scroll_to_fragment(self, id),
     }
   }
 }

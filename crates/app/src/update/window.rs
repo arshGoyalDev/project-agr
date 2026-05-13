@@ -76,6 +76,11 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
 
       if let Some(href) = clicked_href {
         println!("Clicked link: {}", href);
+
+        if href.starts_with('#') {
+          return Task::done(Message::NavigateTo(href));
+        }
+
         let mut url_handler = URLHandler::default();
         url_handler.init(active_tab.url.clone(), false);
         let resolved = url_handler.resolve(&href);
