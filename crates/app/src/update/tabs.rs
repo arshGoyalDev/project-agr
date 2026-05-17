@@ -1,7 +1,8 @@
+use iced::Task;
+
 use crate::browser::Browser;
 use crate::message::Message;
 use crate::tab::Tab;
-use iced::Task;
 
 pub fn new_tab(browser: &mut Browser) -> Task<Message> {
   browser.tabs.push(Tab::new("about:blank".to_string()));
@@ -21,8 +22,12 @@ pub fn switch_tab(browser: &mut Browser, index: usize) -> Task<Message> {
   Task::none()
 }
 
-pub fn close_tab(browser: &mut Browser, index: usize) -> Task<Message> {
+pub fn close_tab(browser: &mut Browser, mut index: usize, curr_tab: bool) -> Task<Message> {
   if browser.tabs.len() > 1 {
+    if curr_tab {
+      index = browser.active_tab_index;
+    }
+
     browser.tabs.remove(index);
 
     if browser.active_tab_index >= index && browser.active_tab_index > 0 {

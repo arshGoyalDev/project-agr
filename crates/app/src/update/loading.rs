@@ -1,11 +1,13 @@
+use iced::Task;
+
 use crate::browser::Browser;
 use crate::dom::{extract_title, find_inline_styles, find_stylesheet_links};
 use crate::message::Message;
 use crate::net::fetch_css_task;
+
 use css_parser::CSSParser;
 use css_parser::style;
 use html_parser::HTMLParser;
-use iced::Task;
 use layout::{DocumentLayout, syntax_highlight};
 
 pub fn html_fetched(

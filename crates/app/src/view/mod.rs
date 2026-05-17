@@ -52,7 +52,7 @@ impl Browser {
 
       if is_active || is_hovered {
         let close_btn = Button::new(Text::new("×").size(14.0))
-          .on_press(Message::CloseTab(i))
+          .on_press(Message::CloseTab(i, false))
           .style(button::text)
           .padding([0, 4]);
         single_tab_content = single_tab_content.push(close_btn);

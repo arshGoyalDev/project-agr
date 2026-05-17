@@ -1,7 +1,9 @@
+use iced::{Task, window};
+
 use crate::browser::Browser;
 use crate::message::Message;
+
 use html_parser::Node;
-use iced::{Task, window};
 use net::URLHandler;
 
 pub fn title_bar_pressed() -> Task<Message> {

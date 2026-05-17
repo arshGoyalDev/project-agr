@@ -3,9 +3,10 @@ pub mod navigation;
 pub mod tabs;
 pub mod window;
 
+use iced::Task;
+
 use crate::browser::Browser;
 use crate::message::Message;
-use iced::Task;
 
 impl Browser {
   pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -23,7 +24,7 @@ impl Browser {
       // Tab Management
       Message::TabHovered(index) => tabs::tab_hovered(self, index),
       Message::TabUnhovered => tabs::tab_unhovered(self),
-      Message::CloseTab(index) => tabs::close_tab(self, index),
+      Message::CloseTab(index, curr_tab) => tabs::close_tab(self, index, curr_tab),
       Message::NewTab => tabs::new_tab(self),
       Message::SwitchTab(index) => tabs::switch_tab(self, index),
 

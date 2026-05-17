@@ -7,7 +7,6 @@ pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
   let active_tab = &browser.tabs[browser.active_tab_index];
   let current_url = active_tab.url.clone();
 
-  // 1. Omnibox Heuristics (Requirement 7-6)
   let final_url = if url.contains("://") || url.starts_with("about:") || url.starts_with("data:") {
     url.clone()
   } else if url.starts_with('#') {

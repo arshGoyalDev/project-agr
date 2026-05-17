@@ -41,23 +41,48 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
           Some(Message::ScrollChanged(new_offset)),
         )
       }
-      Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) => {
-        let new_offset = match key {
-          keyboard::Key::Named(keyboard::key::Named::ArrowUp) => {
-            (self.scroll_offset - 20.0).max(0.0)
-          }
-          keyboard::Key::Named(keyboard::key::Named::ArrowDown) => {
-            let total_content_height = self.max_y + 40.0;
-            let scrollable_limit = (total_content_height - bounds.height).max(0.0);
-            (self.scroll_offset + 20.0).min(scrollable_limit)
-          }
-          _ => self.scroll_offset,
-        };
-        (
-          event::Status::Captured,
-          Some(Message::ScrollChanged(new_offset)),
-        )
-      }
+      Event::Keyboard(keyboard_event) => match keyboard_event {
+        keyboard::Event::KeyPressed {
+          key: keyboard::Key::Character(c),
+          modifiers: keyboard::Modifiers::CTRL,
+          ..
+        } if c == "w" => (event::Status::Captured, Some(Message::CloseTab(0, true))),
+        keyboard::Event::KeyPressed {
+          key: keyboard::Key::Character(c),
+          modifiers: keyboard::Modifiers::CTRL,
+          ..
+        } if c == "t" => (event::Status::Captured, Some(Message::NewTab)),
+        keyboard::Event::KeyPressed {
+          key: keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+          ..
+        } => {
+          let total_content_height = self.max_y + 40.0;
+          let scrollable_limit = (total_content_height - bounds.height).max(0.0);
+          let new_offset = (self.scroll_offset + 20.0).min(scrollable_limit);
+
+          (
+            event::Status::Captured,
+            Some(Message::ScrollChanged(new_offset)),
+          )
+        }
+        keyboard::Event::KeyPressed {
+          key: keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+          ..
+        } => {
+          let new_offset = (self.scroll_offset - 20.0).max(0.0);
+          (
+            event::Status::Captured,
+            Some(Message::ScrollChanged(new_offset)),
+          )
+        }
+        _ => {
+          let new_offset = self.scroll_offset;
+          (
+            event::Status::Captured,
+            Some(Message::ScrollChanged(new_offset)),
+          )
+        }
+      },
       Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
         if let Some(cursor_position) = cursor.position_in(bounds) {
           return (

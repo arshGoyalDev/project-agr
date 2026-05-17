@@ -16,7 +16,7 @@ pub enum Message {
   MinimizeWindow,
   ToggleMaximizeWindow,
   CloseWindow,
-  CloseTab(usize),
+  CloseTab(usize, bool),
   TabHovered(usize),
   TabUnhovered,
   ScrollToFragment(String),
