@@ -207,7 +207,7 @@ impl URLHandler {
     (true, None)
   }
 
-  pub fn request(&mut self) -> Result<String, Box<dyn std::error::Error>> {
+  pub fn request(&mut self, payload: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
     const REDIRECT_LIMIT: i32 = 10;
     let mut redirects = 0;
 
@@ -221,9 +221,11 @@ impl URLHandler {
       } else {
         let cache_key = format!("{}://{}:{}{}", self.scheme, self.host, self.port, self.path);
 
-        if let Some(cached_content) = self.check_cache(&cache_key) {
-          println!("[Cache Hit] {}", cache_key);
-          return Ok(cached_content);
+        if payload.is_none() {
+          if let Some(cached_content) = self.check_cache(&cache_key) {
+            println!("[Cache Hit] {}", cache_key);
+            return Ok(cached_content);
+          }
         }
 
         println!("[Cache Miss] {}", cache_key);
@@ -233,9 +235,9 @@ impl URLHandler {
         if self.scheme == "https" {
           let connector = TlsConnector::new()?;
           let tls_stream = connector.connect(&self.host, stream)?;
-          return self.handle_http_response(tls_stream, &mut redirects, &cache_key);
+          return self.handle_http_response(tls_stream, &mut redirects, &cache_key, payload);
         } else {
-          return self.handle_http_response(stream, &mut redirects, &cache_key);
+          return self.handle_http_response(stream, &mut redirects, &cache_key, payload);
         }
       }
     }
@@ -248,6 +250,7 @@ impl URLHandler {
     stream: S,
     redirects: &mut i32,
     cache_key: &str,
+    payload: Option<&str>,
   ) -> Result<String, Box<dyn std::error::Error>> {
     const REDIRECT_LIMIT: i32 = 10;
 
@@ -261,13 +264,22 @@ impl URLHandler {
         ("Accept-Encoding", "gzip"),
       ];
 
-      let mut request = format!("GET {} HTTP/1.1\r\n", self.path);
+      let method = if payload.is_some() { "POST" } else { "GET" };
+      let mut request = format!("{} {} HTTP/1.1\r\n", method, self.path);
 
       for (header, value) in &headers {
         request.push_str(&format!("{}: {}\r\n", header, value));
       }
 
+      if let Some(p) = payload {
+        request.push_str(&format!("Content-Length: {}\r\n", p.as_bytes().len()));
+      }
+
       request.push_str("\r\n");
+
+      if let Some(p) = payload {
+        request.push_str(p);
+      }
 
       stream.write_all(request.as_bytes())?;
 
@@ -324,7 +336,8 @@ impl URLHandler {
             return Err("Too many redirects".into());
           }
 
-          return self.request();
+          // Persist the payload through the redirect
+          return self.request(payload);
         } else {
           return Err(format!("Redirect without location header: {}", status).into());
         }
@@ -361,7 +374,9 @@ impl URLHandler {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8 sequence"))?;
 
       let (should_cache, max_age) = self.should_cache(&response_headers, status);
-      if should_cache {
+
+      // Do not cache POST responses
+      if should_cache && payload.is_none() {
         let current_time = SystemTime::now()
           .duration_since(UNIX_EPOCH)
           .unwrap()
