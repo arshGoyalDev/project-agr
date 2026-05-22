@@ -1,6 +1,7 @@
 pub const HSTEP: f32 = 9.0;
 pub const VSTEP: f32 = 15.0;
 pub const PRE_BG: [f32; 4] = [0.5, 0.5, 0.5, 1.0];
+pub const INPUT_WIDTH_PX: f32 = 160.0;
 
 pub const BLOCK_ELEMENTS: &[&str] = &[
   "html",

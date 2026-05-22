@@ -1,6 +1,7 @@
 use crate::display_list::DisplayList;
+use crate::input_layout::InputLayout;
 use crate::layout::{HSTEP, VSTEP, decode_entities};
-use crate::line_layout::LineLayout;
+use crate::line_layout::{InlineLayout, LineLayout};
 use crate::text_layout::TextLayout;
 use html_parser::Node;
 
@@ -47,7 +48,7 @@ pub struct BlockLayout {
   is_superscript: bool,
   is_preformatted: bool,
   needs_space: bool,
-  current_line: Vec<TextLayout>,
+  current_line: Vec<InlineLayout>, // UPDATED
 }
 
 impl BlockLayout {
@@ -83,7 +84,10 @@ impl BlockLayout {
             == "block"
         });
 
-        if has_block_child {
+        // Treat inputs and buttons natively as inline components
+        if e.tag == "input" || e.tag == "button" {
+          LayoutMode::Inline
+        } else if has_block_child {
           LayoutMode::Block
         } else if !e.children.is_empty() {
           LayoutMode::Inline
@@ -184,6 +188,14 @@ impl BlockLayout {
         if element.tag == "script" {
           return;
         }
+
+        // Intercept inputs and buttons and draw them immediately
+        if element.tag == "input" || element.tag == "button" {
+          drop(node);
+          self.input(node_rc, font_cache);
+          return;
+        }
+
         let tag = element.tag.clone();
         let children: Vec<Rc<RefCell<Node>>> = element.children.iter().map(Rc::clone).collect();
         drop(node);
@@ -290,7 +302,7 @@ impl BlockLayout {
     if !self.is_preformatted && self.cursor_x + space_advance + word_size.width > self.width - HSTEP
     {
       self.flush();
-      self.current_line.push(TextLayout {
+      self.current_line.push(InlineLayout::Text(TextLayout {
         node: node_rc.clone(),
         width: word_size.width,
         x: self.cursor_x,
@@ -300,10 +312,10 @@ impl BlockLayout {
         size,
         color,
         is_superscript: self.is_superscript,
-      });
+      }));
       self.cursor_x += word_size.width;
     } else {
-      self.current_line.push(TextLayout {
+      self.current_line.push(InlineLayout::Text(TextLayout {
         node: node_rc.clone(),
         width: word_size.width,
         x: if self.is_superscript {
@@ -317,8 +329,94 @@ impl BlockLayout {
         size,
         color,
         is_superscript: self.is_superscript,
-      });
+      }));
       self.cursor_x += space_advance + word_size.width;
+    }
+
+    self.needs_space = true;
+  }
+
+  // --- NEW: Handle rendering inputs exactly like words! ---
+  fn input(&mut self, node_rc: &Rc<RefCell<Node>>, font_cache: &mut HashMap<FontKey, Font>) {
+    let node = node_rc.borrow();
+    let style_map = node.style();
+
+    let weight = match style_map.get("font-weight").map(|s| s.as_str()) {
+      Some("bold") => Weight::Bold,
+      _ => Weight::Normal,
+    };
+
+    let style = match style_map.get("font-style").map(|s| s.as_str()) {
+      Some("italic") | Some("oblique") => Style::Italic,
+      _ => Style::Normal,
+    };
+
+    let mut size: f32 = style_map
+      .get("font-size")
+      .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok())
+      .map(|px| px * 0.75)
+      .unwrap_or(12.0);
+
+    size = size.max(1.0);
+
+    let family_str = style_map
+      .get("font-family")
+      .cloned()
+      .unwrap_or_else(|| "sans-serif".to_string());
+
+    drop(node);
+
+    let font = get_font(&family_str, weight, style, size, font_cache);
+
+    // Get a space size to separate the input from adjacent text
+    let make_paragraph = |content: &str| {
+      GraphicsParagraph::with_text(AdvancedText {
+        content,
+        bounds: Size::INFINITY,
+        size: Pixels(size),
+        line_height: LineHeight::default(),
+        font,
+        horizontal_alignment: alignment::Horizontal::Left,
+        vertical_alignment: alignment::Vertical::Top,
+        shaping: Shaping::Basic,
+        wrapping: Wrapping::None,
+      })
+    };
+
+    let space_size = make_paragraph(" ").min_bounds();
+    let space_advance = if self.needs_space {
+      space_size.width
+    } else {
+      0.0
+    };
+
+    let input_width = crate::layout::INPUT_WIDTH_PX;
+    let input_height = size * 1.5; // Input box scales proportionally with font size
+
+    // Line wrap logic
+    if self.cursor_x + space_advance + input_width > self.width - HSTEP {
+      self.flush();
+      self.current_line.push(InlineLayout::Input(InputLayout {
+        node: node_rc.clone(),
+        font,
+        size,
+        x: self.cursor_x,
+        y: 0.0,
+        width: input_width,
+        height: input_height,
+      }));
+      self.cursor_x += input_width;
+    } else {
+      self.current_line.push(InlineLayout::Input(InputLayout {
+        node: node_rc.clone(),
+        font,
+        size,
+        x: self.cursor_x + space_advance,
+        y: 0.0,
+        width: input_width,
+        height: input_height,
+      }));
+      self.cursor_x += space_advance + input_width;
     }
 
     self.needs_space = true;
@@ -355,7 +453,7 @@ impl BlockLayout {
     let max_ascent = self
       .current_line
       .iter()
-      .map(|i| i.size * 0.8)
+      .map(|i| i.size() * 0.8)
       .fold(0.0_f32, f32::max);
     let baseline = self.cursor_y + 1.25 * max_ascent;
 
@@ -367,18 +465,23 @@ impl BlockLayout {
     };
 
     for item in &mut self.current_line {
-      item.x = self.x + item.x + offset;
-      item.y = if item.is_superscript {
-        self.y + baseline - item.size * 2.0
+      let current_x = item.x();
+      item.set_x(self.x + current_x + offset);
+      let size = item.size();
+
+      if item.is_superscript() {
+        item.set_y(self.y + baseline - size * 2.0);
       } else {
-        self.y + baseline - item.size
-      };
+        // By aligning both words and inputs to the baseline minus their height
+        // they will sit cleanly next to each other on the page
+        item.set_y(self.y + baseline - size);
+      }
     }
 
     let max_descent = self
       .current_line
       .iter()
-      .map(|i| i.size * 0.2)
+      .map(|i| i.size() * 0.2)
       .fold(0.0_f32, f32::max);
     let line_height = (baseline + 1.25 * max_descent) - self.cursor_y;
 

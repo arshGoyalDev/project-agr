@@ -1,6 +1,7 @@
 pub mod block_layout;
 pub mod display_list;
 pub mod document_layout;
+pub mod input_layout;
 pub mod layout;
 pub mod line_layout;
 pub mod syntax_highlight;
