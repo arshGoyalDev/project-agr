@@ -4,7 +4,7 @@ pub enum Message {
   WindowResized(f32, f32),
   Click(f32, f32),
   NavigateTo(String),
-  LoadUrl(usize, String),
+  LoadUrl(usize, String, Option<String>),
   HtmlFetched(usize, String, bool, Result<String, String>),
   CssFetched(usize, Vec<String>),
   AddressInputChanged(String),
@@ -21,4 +21,6 @@ pub enum Message {
   TabUnhovered,
   ScrollToFragment(String),
   ToggleBookmark,
+  KeyPressed(char),
+  BackspacePressed,
 }

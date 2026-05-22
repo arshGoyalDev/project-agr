@@ -32,7 +32,7 @@ impl Browser {
         height: 600.0,
         bookmarks: Vec::new(),
       },
-      Task::done(Message::LoadUrl(0, url)),
+      Task::done(Message::LoadUrl(0, url, None)),
     )
   }
 

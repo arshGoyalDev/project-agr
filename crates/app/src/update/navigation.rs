@@ -46,7 +46,7 @@ pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
     tab.history_index = tab.history.len() - 1;
   }
 
-  Task::done(Message::LoadUrl(browser.active_tab_index, final_url))
+  Task::done(Message::LoadUrl(browser.active_tab_index, final_url, None))
 }
 
 pub fn scroll_to_fragment(browser: &mut Browser, fragment: String) -> Task<Message> {
@@ -67,7 +67,7 @@ pub fn go_back(browser: &mut Browser) -> Task<Message> {
   if tab.history_index > 0 {
     tab.history_index -= 1;
     let prev_url = tab.history[tab.history_index].clone();
-    return Task::done(Message::LoadUrl(browser.active_tab_index, prev_url));
+    return Task::done(Message::LoadUrl(browser.active_tab_index, prev_url, None));
   }
 
   Task::none()
@@ -79,7 +79,7 @@ pub fn go_forward(browser: &mut Browser) -> Task<Message> {
   if tab.history_index + 1 < tab.history.len() {
     tab.history_index += 1;
     let next_url = tab.history[tab.history_index].clone();
-    return Task::done(Message::LoadUrl(browser.active_tab_index, next_url));
+    return Task::done(Message::LoadUrl(browser.active_tab_index, next_url, None));
   }
 
   Task::none()
@@ -98,7 +98,13 @@ pub fn toggle_bookmark(browser: &mut Browser) -> Task<Message> {
   Task::none()
 }
 
-pub fn load_url(browser: &mut Browser, tab_index: usize, url: String) -> Task<Message> {
+// Pass the payload dynamically to fetch_html_task
+pub fn load_url(
+  browser: &mut Browser,
+  tab_index: usize,
+  url: String,
+  payload: Option<String>,
+) -> Task<Message> {
   if let Some(tab) = browser.tabs.get_mut(tab_index) {
     tab.url = url.clone();
     if tab_index == browser.active_tab_index {
@@ -131,7 +137,7 @@ pub fn load_url(browser: &mut Browser, tab_index: usize, url: String) -> Task<Me
   }
 
   Task::perform(
-    fetch_html_task(url),
+    fetch_html_task(url, payload), // <--- Updates here
     move |(base_url, is_view_source, result)| {
       Message::HtmlFetched(tab_index, base_url, is_view_source, result)
     },

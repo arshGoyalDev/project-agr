@@ -44,14 +44,31 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
       Event::Keyboard(keyboard_event) => match keyboard_event {
         keyboard::Event::KeyPressed {
           key: keyboard::Key::Character(c),
-          modifiers: keyboard::Modifiers::CTRL,
+          modifiers,
           ..
-        } if c == "w" => (event::Status::Captured, Some(Message::CloseTab(0, true))),
+        } => {
+          if modifiers.contains(keyboard::Modifiers::CTRL) && c == "w" {
+            (event::Status::Captured, Some(Message::CloseTab(0, true)))
+          } else if modifiers.contains(keyboard::Modifiers::CTRL) && c == "t" {
+            (event::Status::Captured, Some(Message::NewTab))
+          } else if modifiers.is_empty() {
+            if let Some(ch) = c.chars().next() {
+              (event::Status::Captured, Some(Message::KeyPressed(ch)))
+            } else {
+              (event::Status::Ignored, None)
+            }
+          } else {
+            let new_offset = self.scroll_offset;
+            (
+              event::Status::Captured,
+              Some(Message::ScrollChanged(new_offset)),
+            )
+          }
+        }
         keyboard::Event::KeyPressed {
-          key: keyboard::Key::Character(c),
-          modifiers: keyboard::Modifiers::CTRL,
+          key: keyboard::Key::Named(keyboard::key::Named::Backspace),
           ..
-        } if c == "t" => (event::Status::Captured, Some(Message::NewTab)),
+        } => (event::Status::Captured, Some(Message::BackspacePressed)),
         keyboard::Event::KeyPressed {
           key: keyboard::Key::Named(keyboard::key::Named::ArrowDown),
           ..

@@ -21,6 +21,10 @@ impl Browser {
       Message::AddressInputChanged(text) => window::address_input_changed(self, text),
       Message::Click(x, y) => window::click(self, x, y),
 
+      // Typing
+      Message::KeyPressed(c) => window::key_pressed(self, c),
+      Message::BackspacePressed => window::backspace_pressed(self),
+
       // Tab Management
       Message::TabHovered(index) => tabs::tab_hovered(self, index),
       Message::TabUnhovered => tabs::tab_unhovered(self),
@@ -33,7 +37,9 @@ impl Browser {
       Message::NavigateTo(url) => navigation::navigate_to(self, url),
       Message::GoBack => navigation::go_back(self),
       Message::GoForward => navigation::go_forward(self),
-      Message::LoadUrl(tab_index, url) => navigation::load_url(self, tab_index, url),
+      Message::LoadUrl(tab_index, url, payload) => {
+        navigation::load_url(self, tab_index, url, payload)
+      }
 
       // Background Loading Tasks
       Message::HtmlFetched(tab_index, base, is_view_source, res) => {
