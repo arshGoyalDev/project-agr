@@ -3,7 +3,11 @@ use crate::display_list::DisplayList;
 use html_parser::Node;
 
 use iced::Color;
+use iced::advanced::graphics::text::Paragraph as GraphicsParagraph;
+use iced::advanced::text::{Paragraph, Text as AdvancedText};
 use iced::font::Font;
+use iced::widget::text::{LineHeight, Shaping, Wrapping};
+use iced::{Pixels, Size, alignment};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -45,23 +49,22 @@ impl InputLayout {
       .unwrap_or_else(|| "gray".to_string());
     let border_color_val = parse_css_color(&border_color).unwrap_or(Color::from_rgb(0.5, 0.5, 0.5));
 
-    // let border_width = node
-    //   .style()
-    //   .get("border-width")
-    //   .cloned().replace("px", "")
-    //   .parse::<f32>()
-    //   .unwrap_or(1.0);
+    let border_width = node
+      .style()
+      .get("border-width")
+      .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok())
+      .unwrap_or(1.0);
 
     cmds.add_rect(
       self.x,
       self.y,
       self.x + self.width,
-      self.y + 1.0,
+      self.y + border_width,
       border_color_val,
     );
     cmds.add_rect(
       self.x,
-      self.y + self.height - 1.0,
+      self.y + self.height - border_width,
       self.x + self.width,
       self.y + self.height,
       border_color_val,
@@ -69,12 +72,12 @@ impl InputLayout {
     cmds.add_rect(
       self.x,
       self.y,
-      self.x + 1.0,
+      self.x + border_width,
       self.y + self.height,
       border_color_val,
     );
     cmds.add_rect(
-      self.x + self.width - 1.0,
+      self.x + self.width - border_width,
       self.y,
       self.x + self.width,
       self.y + self.height,
@@ -107,14 +110,57 @@ impl InputLayout {
       .and_then(|c| crate::block_layout::parse_css_color(c))
       .unwrap_or(Color::BLACK);
 
+    let is_focused = if let Node::Element(e) = &*node {
+      e.attributes.get("data-focused").map(|s| s.as_str()) == Some("true")
+    } else {
+      false
+    };
+
+    let show_cursor = if let Node::Element(e) = &*node {
+      e.attributes.get("data-cursor-visible").map(|s| s.as_str()) == Some("true")
+    } else {
+      false
+    };
+
+    let mut text_width = 0.0;
+
     if !text.is_empty() {
       cmds.add_text(
         self.x + 4.0,
         self.y + 2.0,
-        text,
+        text.clone(),
         self.font,
         self.size,
         color,
+      );
+
+      if is_focused {
+        let make_paragraph = |content: &str| {
+          GraphicsParagraph::with_text(AdvancedText {
+            content,
+            bounds: Size::INFINITY,
+            size: Pixels(self.size),
+            line_height: LineHeight::default(),
+            font: self.font,
+            horizontal_alignment: alignment::Horizontal::Left,
+            vertical_alignment: alignment::Vertical::Top,
+            shaping: Shaping::Basic,
+            wrapping: Wrapping::None,
+          })
+        };
+        text_width = make_paragraph(&text).min_bounds().width;
+      }
+    }
+
+    // DRAW THE BLINKING CURSOR HERE!
+    if show_cursor {
+      let cursor_x = self.x + 4.0 + text_width;
+      cmds.add_rect(
+        cursor_x,
+        self.y + 4.0,
+        cursor_x + 1.0,
+        self.y + self.height - 4.0,
+        Color::BLACK,
       );
     }
   }

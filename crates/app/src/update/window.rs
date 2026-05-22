@@ -39,14 +39,65 @@ pub fn address_input_changed(browser: &mut Browser, text: String) -> Task<Messag
   Task::none()
 }
 
+pub fn blink_cursor(browser: &mut Browser) -> Task<Message> {
+  browser.cursor_blink_visible = !browser.cursor_blink_visible;
+  let visible_str = if browser.cursor_blink_visible {
+    "true"
+  } else {
+    "false"
+  };
+
+  let mut needs_repaint = false;
+  {
+    let tab = &mut browser.tabs[browser.active_tab_index];
+    if let Some(focus_node) = &tab.focus {
+      let mut borrow = focus_node.borrow_mut();
+      if let Node::Element(e) = &mut *borrow {
+        e.attributes
+          .insert("data-cursor-visible".to_string(), visible_str.to_string());
+        needs_repaint = true;
+      }
+    }
+  }
+
+  if needs_repaint {
+    let tab = &mut browser.tabs[browser.active_tab_index];
+    if let Some(doc) = &mut tab.document {
+      tab.display_list = doc.paint();
+    }
+  }
+
+  Task::none()
+}
+
 pub fn key_pressed(browser: &mut Browser, c: char) -> Task<Message> {
   browser.tabs[browser.active_tab_index].keypress(c);
+
+  browser.cursor_blink_visible = true;
+  if let Some(focus_node) = &browser.tabs[browser.active_tab_index].focus {
+    let mut borrow = focus_node.borrow_mut();
+    if let Node::Element(e) = &mut *borrow {
+      e.attributes
+        .insert("data-cursor-visible".to_string(), "true".to_string());
+    }
+  }
+
   browser.relayout();
   Task::none()
 }
 
 pub fn backspace_pressed(browser: &mut Browser) -> Task<Message> {
   browser.tabs[browser.active_tab_index].backspace();
+
+  browser.cursor_blink_visible = true;
+  if let Some(focus_node) = &browser.tabs[browser.active_tab_index].focus {
+    let mut borrow = focus_node.borrow_mut();
+    if let Node::Element(e) = &mut *borrow {
+      e.attributes
+        .insert("data-cursor-visible".to_string(), "true".to_string());
+    }
+  }
+
   browser.relayout();
   Task::none()
 }
@@ -65,8 +116,14 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
 
     if let Some(doc) = &active_tab.document {
       if let Some(mut current_node) = doc.get_node(x, abs_y) {
-        if active_tab.focus.is_some() {
-          active_tab.focus = None;
+        if let Some(prev_node) = active_tab.focus.take() {
+          {
+            let mut prev_borrow = prev_node.borrow_mut();
+            if let Node::Element(e) = &mut *prev_borrow {
+              e.attributes.remove("data-focused");
+              e.attributes.remove("data-cursor-visible");
+            }
+          }
           relayout_needed = true;
         }
 
@@ -81,7 +138,7 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
                   clicked_href = Some(href.clone());
                 }
               } else if e.tag == "input" {
-                e.attributes.insert("value".to_string(), "".to_string());
+                // e.attributes.insert("value".to_string(), "".to_string());
                 clicked_input = Some(current_node.clone());
               } else if e.tag == "button" {
                 clicked_button = Some(current_node.clone());
@@ -108,9 +165,14 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
           form_submission = active_tab.submit_form(button_node);
         }
       } else {
-        // Clicked empty space — just clear focus
-        if active_tab.focus.is_some() {
-          active_tab.focus = None;
+        if let Some(prev_node) = active_tab.focus.take() {
+          {
+            let mut prev_borrow = prev_node.borrow_mut();
+            if let Node::Element(e) = &mut *prev_borrow {
+              e.attributes.remove("data-focused");
+              e.attributes.remove("data-cursor-visible");
+            }
+          }
           relayout_needed = true;
         }
       }
@@ -127,20 +189,19 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
     let resolved = url_handler.resolve(&href);
     return Task::done(Message::NavigateTo(resolved));
   } else if let Some(input_node) = clicked_input {
+    {
+      let mut borrow = input_node.borrow_mut();
+      if let Node::Element(e) = &mut *borrow {
+        e.attributes
+          .insert("data-focused".to_string(), "true".to_string());
+        e.attributes
+          .insert("data-cursor-visible".to_string(), "true".to_string());
+      }
+    }
+    browser.cursor_blink_visible = true;
     browser.tabs[browser.active_tab_index].focus = Some(input_node);
     browser.relayout();
     return Task::none();
-  } else if let Some((action, payload)) = form_submission {
-    let mut url_handler = URLHandler::default();
-    url_handler.init(browser.tabs[browser.active_tab_index].url.clone(), false);
-    let resolved = url_handler.resolve(&action);
-
-    let final_url = if resolved.contains('?') {
-      format!("{}&{}", resolved, payload)
-    } else {
-      format!("{}?{}", resolved, payload)
-    };
-    return Task::done(Message::NavigateTo(final_url));
   } else if let Some((action, payload)) = form_submission {
     let mut url_handler = URLHandler::default();
     url_handler.init(browser.tabs[browser.active_tab_index].url.clone(), false);

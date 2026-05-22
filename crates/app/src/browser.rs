@@ -1,6 +1,6 @@
 use crate::message::Message;
 use crate::tab::Tab;
-use iced::{Subscription, Task, window};
+use iced::{Subscription, Task, time, window};
 use std::env;
 
 pub struct Browser {
@@ -11,6 +11,7 @@ pub struct Browser {
   pub width: f32,
   pub height: f32,
   pub bookmarks: Vec<String>,
+  pub cursor_blink_visible: bool,
 }
 
 impl Browser {
@@ -31,13 +32,17 @@ impl Browser {
         width: 800.0,
         height: 600.0,
         bookmarks: Vec::new(),
+        cursor_blink_visible: true,
       },
       Task::done(Message::LoadUrl(0, url, None)),
     )
   }
 
   pub fn subscription(&self) -> Subscription<Message> {
-    window::resize_events().map(|(_id, size)| Message::WindowResized(size.width, size.height))
+    Subscription::batch(vec![
+      window::resize_events().map(|(_id, size)| Message::WindowResized(size.width, size.height)),
+      time::every(std::time::Duration::from_millis(530)).map(|_| Message::BlinkCursor),
+    ])
   }
 
   pub fn relayout(&mut self) {

@@ -23,4 +23,5 @@ pub enum Message {
   ToggleBookmark,
   KeyPressed(char),
   BackspacePressed,
+  BlinkCursor,
 }
