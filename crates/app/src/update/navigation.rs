@@ -50,7 +50,7 @@ pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
     browser.active_tab_index,
     final_url,
     None,
-    false,
+    true,
     false,
   ))
 }
