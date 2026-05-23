@@ -21,6 +21,8 @@ struct CacheEntry {
   content: String,
   timestamp: u64,
   max_age: Option<u64>,
+  etag: Option<String>,
+  last_modified: Option<String>,
 }
 
 #[derive(Default)]
@@ -207,7 +209,12 @@ impl URLHandler {
     (true, None)
   }
 
-  pub fn request(&mut self, payload: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
+  pub fn request(
+    &mut self,
+    payload: Option<&str>,
+    reload: bool,
+    hard_reload: bool,
+  ) -> Result<String, Box<dyn std::error::Error>> {
     const REDIRECT_LIMIT: i32 = 10;
     let mut redirects = 0;
 
@@ -221,10 +228,21 @@ impl URLHandler {
       } else {
         let cache_key = format!("{}://{}:{}{}", self.scheme, self.host, self.port, self.path);
 
-        if payload.is_none() {
+        let mut etag = None;
+        let mut last_modified = None;
+
+        if payload.is_none() && !reload && !hard_reload {
           if let Some(cached_content) = self.check_cache(&cache_key) {
             println!("[Cache Hit] {}", cache_key);
             return Ok(cached_content);
+          }
+        }
+
+        if payload.is_none() && !hard_reload {
+          let cache = CACHE.lock().unwrap();
+          if let Some(entry) = cache.get(&cache_key) {
+            etag = entry.etag.clone();
+            last_modified = entry.last_modified.clone();
           }
         }
 
@@ -235,9 +253,27 @@ impl URLHandler {
         if self.scheme == "https" {
           let connector = TlsConnector::new()?;
           let tls_stream = connector.connect(&self.host, stream)?;
-          return self.handle_http_response(tls_stream, &mut redirects, &cache_key, payload);
+          return self.handle_http_response(
+            tls_stream,
+            &mut redirects,
+            &cache_key,
+            payload,
+            reload,
+            hard_reload,
+            etag,
+            last_modified,
+          );
         } else {
-          return self.handle_http_response(stream, &mut redirects, &cache_key, payload);
+          return self.handle_http_response(
+            stream,
+            &mut redirects,
+            &cache_key,
+            payload,
+            reload,
+            hard_reload,
+            etag,
+            last_modified,
+          );
         }
       }
     }
@@ -251,6 +287,10 @@ impl URLHandler {
     redirects: &mut i32,
     cache_key: &str,
     payload: Option<&str>,
+    reload: bool,
+    hard_reload: bool,
+    etag: Option<String>,
+    last_modified: Option<String>,
   ) -> Result<String, Box<dyn std::error::Error>> {
     const REDIRECT_LIMIT: i32 = 10;
 
@@ -264,11 +304,23 @@ impl URLHandler {
         ("Accept-Encoding", "gzip"),
       ];
 
-      let method = if payload.is_some() { "POST" } else { "GET" };
+      let method = if payload.is_some_and(|p| !p.is_empty()) {
+        "POST"
+      } else {
+        "GET"
+      };
       let mut request = format!("{} {} HTTP/1.1\r\n", method, self.path);
 
       for (header, value) in &headers {
         request.push_str(&format!("{}: {}\r\n", header, value));
+      }
+
+      if let Some(e) = &etag {
+        request.push_str(&format!("If-None-Match: {}\r\n", e));
+      }
+
+      if let Some(lm) = &last_modified {
+        request.push_str(&format!("If-Modified-Since: {}\r\n", lm));
       }
 
       if let Some(p) = payload {
@@ -310,6 +362,14 @@ impl URLHandler {
         }
       }
 
+      if status == &"304" {
+        let cache = CACHE.lock().unwrap();
+        if let Some(entry) = cache.get(cache_key) {
+          println!("[304 Not Modified] Using cached version of {}", cache_key);
+          return Ok(entry.content.clone());
+        }
+      }
+
       if status.starts_with("3") {
         if let Some(location) = response_headers.get("location") {
           // clear the buffer before redirecting (good practice)
@@ -337,7 +397,7 @@ impl URLHandler {
           }
 
           // Persist the payload through the redirect
-          return self.request(payload);
+          return self.request(payload, reload, hard_reload);
         } else {
           return Err(format!("Redirect without location header: {}", status).into());
         }
@@ -382,10 +442,15 @@ impl URLHandler {
           .unwrap()
           .as_secs();
 
+        let etag = response_headers.get("etag").cloned();
+        let last_modified = response_headers.get("last-modified").cloned();
+
         let entry = CacheEntry {
           content: content.clone(),
           timestamp: current_time,
           max_age,
+          etag,
+          last_modified,
         };
 
         let mut cache = CACHE.lock().unwrap();
