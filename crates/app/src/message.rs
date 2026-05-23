@@ -32,4 +32,5 @@ pub enum Message {
   KeyPressed(char),
   BackspacePressed,
   BlinkCursor,
+  EnterPressed,
 }

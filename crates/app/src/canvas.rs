@@ -92,6 +92,10 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
           }
         }
         keyboard::Event::KeyPressed {
+          key: keyboard::Key::Named(keyboard::key::Named::Enter),
+          ..
+        } => (event::Status::Captured, Some(Message::EnterPressed)),
+        keyboard::Event::KeyPressed {
           key: keyboard::Key::Named(keyboard::key::Named::Backspace),
           ..
         } => (event::Status::Captured, Some(Message::BackspacePressed)),

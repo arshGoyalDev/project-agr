@@ -86,6 +86,36 @@ pub fn key_pressed(browser: &mut Browser, c: char) -> Task<Message> {
   Task::none()
 }
 
+pub fn enter_pressed(browser: &mut Browser) -> Task<Message> {
+  let mut form_submission = None;
+
+  {
+    let active_tab = &mut browser.tabs[browser.active_tab_index];
+
+    if let Some(focus_node) = &active_tab.focus {
+      form_submission = active_tab.submit_form(focus_node.clone());
+    }
+  }
+
+  if let Some((action, payload)) = form_submission {
+    let mut url_handler = URLHandler::default();
+
+    url_handler.init(browser.tabs[browser.active_tab_index].url.clone(), false);
+
+    let resolved = url_handler.resolve(&action);
+
+    return Task::done(Message::LoadUrl(
+      browser.active_tab_index,
+      resolved,
+      Some(payload),
+      false,
+      false,
+    ));
+  }
+
+  Task::none()
+}
+
 pub fn backspace_pressed(browser: &mut Browser) -> Task<Message> {
   browser.tabs[browser.active_tab_index].backspace();
 
