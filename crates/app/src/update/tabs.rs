@@ -12,6 +12,8 @@ pub fn new_tab(browser: &mut Browser) -> Task<Message> {
     browser.active_tab_index,
     "about:blank".to_string(),
     None,
+    false,
+    false,
   ))
 }
 
@@ -43,7 +45,13 @@ pub fn close_tab(browser: &mut Browser, mut index: usize, curr_tab: bool) -> Tas
     // Last tab — replace with blank rather than exiting
     browser.tabs[0] = Tab::new("about:blank".to_string());
     browser.address_bar_text = "about:blank".to_string();
-    Task::done(Message::LoadUrl(0, "about:blank".to_string(), None))
+    Task::done(Message::LoadUrl(
+      0,
+      "about:blank".to_string(),
+      None,
+      false,
+      false,
+    ))
   }
 }
 

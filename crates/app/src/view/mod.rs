@@ -151,6 +151,15 @@ impl Browser {
       forward_btn = forward_btn.on_press(Message::GoForward);
     }
 
+    let reload_btn = Button::new(Text::new("Reload"))
+      .style(button::text)
+      .on_press(Message::Reload(
+        self.active_tab_index,
+        active_tab.url.clone(),
+        None,
+        false,
+      ));
+
     let is_bookmarked = self.bookmarks.contains(&active_tab.url);
     let bookmark_btn = Button::new(
       Text::new(if is_bookmarked { "★" } else { "☆" })
@@ -169,6 +178,7 @@ impl Browser {
       .padding(5)
       .push(back_btn)
       .push(forward_btn)
+      .push(reload_btn)
       .push(
         TextInput::new("Enter URL...", &self.address_bar_text)
           .on_input(Message::AddressInputChanged)

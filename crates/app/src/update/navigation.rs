@@ -46,7 +46,13 @@ pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
     tab.history_index = tab.history.len() - 1;
   }
 
-  Task::done(Message::LoadUrl(browser.active_tab_index, final_url, None))
+  Task::done(Message::LoadUrl(
+    browser.active_tab_index,
+    final_url,
+    None,
+    false,
+    false,
+  ))
 }
 
 pub fn scroll_to_fragment(browser: &mut Browser, fragment: String) -> Task<Message> {
@@ -67,7 +73,13 @@ pub fn go_back(browser: &mut Browser) -> Task<Message> {
   if tab.history_index > 0 {
     tab.history_index -= 1;
     let prev_url = tab.history[tab.history_index].clone();
-    return Task::done(Message::LoadUrl(browser.active_tab_index, prev_url, None));
+    return Task::done(Message::LoadUrl(
+      browser.active_tab_index,
+      prev_url,
+      None,
+      false,
+      false,
+    ));
   }
 
   Task::none()
@@ -79,7 +91,13 @@ pub fn go_forward(browser: &mut Browser) -> Task<Message> {
   if tab.history_index + 1 < tab.history.len() {
     tab.history_index += 1;
     let next_url = tab.history[tab.history_index].clone();
-    return Task::done(Message::LoadUrl(browser.active_tab_index, next_url, None));
+    return Task::done(Message::LoadUrl(
+      browser.active_tab_index,
+      next_url,
+      None,
+      false,
+      false,
+    ));
   }
 
   Task::none()
@@ -98,12 +116,23 @@ pub fn toggle_bookmark(browser: &mut Browser) -> Task<Message> {
   Task::none()
 }
 
-// Pass the payload dynamically to fetch_html_task
+pub fn reload(
+  _browser: &mut Browser,
+  tab_index: usize,
+  url: String,
+  payload: Option<String>,
+  hard_reload: bool,
+) -> Task<Message> {
+  Task::done(Message::LoadUrl(tab_index, url, payload, true, hard_reload))
+}
+
 pub fn load_url(
   browser: &mut Browser,
   tab_index: usize,
   url: String,
   payload: Option<String>,
+  reload: bool,
+  hard_reload: bool,
 ) -> Task<Message> {
   if let Some(tab) = browser.tabs.get_mut(tab_index) {
     tab.url = url.clone();
@@ -133,13 +162,22 @@ pub fn load_url(
       url.clone(),
       false,
       Ok(html),
+      false,
+      false,
     ));
   }
 
   Task::perform(
-    fetch_html_task(url, payload), // <--- Updates here
+    fetch_html_task(url, payload, reload, hard_reload),
     move |(base_url, is_view_source, result)| {
-      Message::HtmlFetched(tab_index, base_url, is_view_source, result)
+      Message::HtmlFetched(
+        tab_index,
+        base_url,
+        is_view_source,
+        result,
+        reload,
+        hard_reload,
+      )
     },
   )
 }

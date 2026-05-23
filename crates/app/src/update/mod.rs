@@ -38,13 +38,22 @@ impl Browser {
       Message::NavigateTo(url) => navigation::navigate_to(self, url),
       Message::GoBack => navigation::go_back(self),
       Message::GoForward => navigation::go_forward(self),
-      Message::LoadUrl(tab_index, url, payload) => {
-        navigation::load_url(self, tab_index, url, payload)
+      Message::LoadUrl(tab_index, url, payload, reload, hard_reload) => {
+        navigation::load_url(self, tab_index, url, payload, reload, hard_reload)
       }
-
-      // Background Loading Tasks
-      Message::HtmlFetched(tab_index, base, is_view_source, res) => {
-        loading::html_fetched(self, tab_index, base, is_view_source, res)
+      Message::Reload(tab_index, url, payload, hard_reload) => {
+        navigation::reload(self, tab_index, url, payload, hard_reload)
+      }
+      Message::HtmlFetched(tab_index, base, is_view_source, res, reload, hard_reload) => {
+        loading::html_fetched(
+          self,
+          tab_index,
+          base,
+          is_view_source,
+          res,
+          reload,
+          hard_reload,
+        )
       }
       Message::CssFetched(tab_index, css_bodies) => {
         loading::css_fetched(self, tab_index, css_bodies)

@@ -1,26 +1,34 @@
 #[derive(Debug, Clone)]
 pub enum Message {
-  ScrollChanged(f32),
+  // window
   WindowResized(f32, f32),
-  Click(f32, f32),
-  NavigateTo(String),
-  LoadUrl(usize, String, Option<String>),
-  HtmlFetched(usize, String, bool, Result<String, String>),
-  CssFetched(usize, Vec<String>),
-  AddressInputChanged(String),
-  NewTab,
-  SwitchTab(usize),
-  GoBack,
-  GoForward,
   TitleBarPressed,
   MinimizeWindow,
   ToggleMaximizeWindow,
   CloseWindow,
+
+  // web
+  NavigateTo(String),
+  LoadUrl(usize, String, Option<String>, bool, bool),
+  HtmlFetched(usize, String, bool, Result<String, String>, bool, bool),
+  CssFetched(usize, Vec<String>),
+  Reload(usize, String, Option<String>, bool),
+
+  // tab
+  NewTab,
+  SwitchTab(usize),
+  GoBack,
+  GoForward,
+  AddressInputChanged(String),
   CloseTab(usize, bool),
   TabHovered(usize),
   TabUnhovered,
-  ScrollToFragment(String),
   ToggleBookmark,
+  ScrollChanged(f32),
+  ScrollToFragment(String),
+
+  // inputs
+  Click(f32, f32),
   KeyPressed(char),
   BackspacePressed,
   BlinkCursor,

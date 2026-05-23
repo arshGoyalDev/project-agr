@@ -211,6 +211,8 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
       browser.active_tab_index,
       resolved,
       Some(payload),
+      false,
+      false,
     ));
   }
 

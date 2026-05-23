@@ -34,7 +34,7 @@ impl Browser {
         bookmarks: Vec::new(),
         cursor_blink_visible: true,
       },
-      Task::done(Message::LoadUrl(0, url, None)),
+      Task::done(Message::LoadUrl(0, url, None, false, false)),
     )
   }
 

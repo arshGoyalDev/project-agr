@@ -16,6 +16,8 @@ pub fn html_fetched(
   base_url: String,
   is_view_source: bool,
   result: Result<String, String>,
+  reload: bool,
+  hard_reload: bool,
 ) -> Task<Message> {
   if let Some(tab) = browser.tabs.get_mut(tab_index) {
     if let Ok(body) = result {
@@ -35,9 +37,10 @@ pub fn html_fetched(
       if links.is_empty() {
         return Task::done(Message::CssFetched(tab_index, vec![]));
       } else {
-        return Task::perform(fetch_css_task(links, base_url), move |bodies| {
-          Message::CssFetched(tab_index, bodies)
-        });
+        return Task::perform(
+          fetch_css_task(links, base_url, reload, hard_reload),
+          move |bodies| Message::CssFetched(tab_index, bodies),
+        );
       }
     } else {
       tab.title = String::from("Network Error");
