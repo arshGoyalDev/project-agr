@@ -41,7 +41,9 @@ impl URLHandler {
   pub fn init(&mut self, url: String, view_source: bool) {
     self.view_source = view_source;
 
-    match self.parse_url(url.clone()) {
+    let url_clean = url.split('#').next().unwrap_or(&url).to_string();
+
+    match self.parse_url(url_clean) {
       Err(error) => {
         println!("Malformed URL: {url}. Loading about:blank instead");
         println!("{error:?}");
