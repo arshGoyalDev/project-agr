@@ -9,6 +9,7 @@ pub enum Message {
   AddressInputChanged(String),
   ScrollChanged(f32),
   Click(f32, f32),
+  FontLoaded(Result<(), iced::font::Error>),
 
   // Navigation
   NavigateTo(String),

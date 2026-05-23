@@ -1,6 +1,15 @@
 use iced::widget::{Button, Container, Row, Text, button};
 use iced::{Background, Border, Color, Length, Shadow, Theme};
 
+use iced::font::{Family, Font, Stretch, Style, Weight};
+
+const ICONS: Font = Font {
+  family: Family::Name("bootstrap-icons"),
+  weight: Weight::Normal,
+  stretch: Stretch::Normal,
+  style: Style::Normal,
+};
+
 fn close_style(_theme: &Theme, status: button::Status) -> button::Style {
   match status {
     button::Status::Hovered | button::Status::Pressed => button::Style {
@@ -76,7 +85,7 @@ fn ctrl_btn<'a, Message: Clone + 'a>(
   style: impl Fn(&Theme, button::Status) -> button::Style + 'a,
 ) -> Button<'a, Message> {
   Button::new(
-    Container::new(Text::new(label).size(font_size))
+    Container::new(Text::new(label).font(ICONS).size(font_size))
       .width(Length::Fill)
       .height(Length::Fill)
       .align_x(iced::alignment::Horizontal::Center)
@@ -100,7 +109,7 @@ where
   Row::new()
     .spacing(0)
     .align_y(iced::Alignment::Center)
-    .push(ctrl_btn("–", 14.0, on_minimize, neutral_style))
-    .push(ctrl_btn("□", 11.0, on_maximize, neutral_style))
-    .push(ctrl_btn("×", 16.0, on_close, close_style))
+    .push(ctrl_btn("\u{F2EA}", 14.0, on_minimize, neutral_style))
+    .push(ctrl_btn("\u{F584}", 8.0, on_maximize, neutral_style))
+    .push(ctrl_btn("\u{F62A}", 16.0, on_close, close_style))
 }

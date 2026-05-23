@@ -1,6 +1,6 @@
 use crate::message::Message;
 use crate::tab::Tab;
-use iced::{Subscription, Task, time, window};
+use iced::{Subscription, Task, font, time, window};
 use std::env;
 
 pub struct Browser {
@@ -23,6 +23,12 @@ impl Browser {
 
     let initial_tab = Tab::new(url.clone());
 
+    let load_url_task = Task::done(Message::LoadUrl(0, url.clone(), None, false, false));
+
+    let load_font_task =
+      font::load(include_bytes!("../../../assets/bootstrap-icons.ttf").as_slice())
+        .map(Message::FontLoaded);
+
     (
       Self {
         tabs: vec![initial_tab],
@@ -34,7 +40,7 @@ impl Browser {
         bookmarks: Vec::new(),
         cursor_blink_visible: true,
       },
-      Task::done(Message::LoadUrl(0, url, None, false, false)),
+      Task::batch(vec![load_font_task, load_url_task]),
     )
   }
 

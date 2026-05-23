@@ -20,6 +20,7 @@ impl Browser {
       Message::ScrollChanged(offset) => window::scroll_changed(self, offset),
       Message::AddressInputChanged(text) => window::address_input_changed(self, text),
       Message::Click(x, y) => window::click(self, x, y),
+      Message::FontLoaded(_) => Task::none(),
 
       // Typing
       Message::KeyPressed(c) => window::key_pressed(self, c),

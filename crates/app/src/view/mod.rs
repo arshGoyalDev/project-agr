@@ -4,10 +4,18 @@ use crate::dom::get_page_bg_color;
 use crate::message::Message;
 use crate::window_controls::window_controls;
 
+use iced::font::{Family, Font, Stretch, Style, Weight};
 use iced::widget::{
   Button, Canvas, Column, Container, MouseArea, Row, Space, Text, TextInput, button,
 };
 use iced::{Background, Border, Color, Element, Length, Shadow};
+
+const ICONS: Font = Font {
+  family: Family::Name("bootstrap-icons"),
+  weight: Weight::Normal,
+  stretch: Stretch::Normal,
+  style: Style::Normal,
+};
 
 impl Browser {
   pub fn view(&self) -> Element<'_, Message> {
@@ -51,7 +59,7 @@ impl Browser {
       let mut single_tab_content = Row::new().align_y(iced::Alignment::Center).push(label_btn);
 
       if is_active || is_hovered {
-        let close_btn = Button::new(Text::new("×").size(14.0))
+        let close_btn = Button::new(Text::new("\u{F62A}").font(ICONS).size(14.0))
           .on_press(Message::CloseTab(i, false))
           .style(button::text)
           .padding([0, 4]);
@@ -89,7 +97,7 @@ impl Browser {
     // New Tab Button
     tab_row = tab_row.push(
       Button::new(
-        Container::new(Text::new("+").size(14.0))
+        Container::new(Text::new("\u{F4FE}").font(ICONS).size(18.0))
           .width(Length::Fill)
           .height(Length::Fill)
           .align_x(iced::alignment::Horizontal::Center)
@@ -141,17 +149,17 @@ impl Browser {
       });
 
     // Address Bar
-    let mut back_btn = Button::new(Text::new("<")).style(button::text);
+    let mut back_btn = Button::new(Text::new("\u{F284}").font(ICONS)).style(button::text);
     if can_go_back {
       back_btn = back_btn.on_press(Message::GoBack);
     }
 
-    let mut forward_btn = Button::new(Text::new(">")).style(button::text);
+    let mut forward_btn = Button::new(Text::new("\u{F285}").font(ICONS)).style(button::text);
     if can_go_forward {
       forward_btn = forward_btn.on_press(Message::GoForward);
     }
 
-    let reload_btn = Button::new(Text::new("Reload"))
+    let reload_btn = Button::new(Text::new("\u{F116}").font(ICONS))
       .style(button::text)
       .on_press(Message::Reload(
         self.active_tab_index,
@@ -162,8 +170,8 @@ impl Browser {
 
     let is_bookmarked = self.bookmarks.contains(&active_tab.url);
     let bookmark_btn = Button::new(
-      Text::new(if is_bookmarked { "★" } else { "☆" })
-        .size(18.0)
+      Text::new(if is_bookmarked { "\u{F586}" } else { "\u{F588}" }).font(ICONS)
+        .size(14.0)
         .color(if is_bookmarked {
           Color::from_rgb8(255, 215, 0)
         } else {
@@ -174,7 +182,7 @@ impl Browser {
     .on_press(Message::ToggleBookmark);
 
     let address_bar = Row::new()
-      .spacing(10)
+      .spacing(5)
       .padding(5)
       .push(back_btn)
       .push(forward_btn)
