@@ -13,6 +13,8 @@ pub struct BrowserCanvas<'a> {
   pub display_list: &'a DisplayList,
   pub scroll_offset: f32,
   pub max_y: f32,
+  pub url: String,
+  pub active_tab_index: usize,
 }
 
 impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
@@ -47,10 +49,34 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
           modifiers,
           ..
         } => {
-          if modifiers.contains(keyboard::Modifiers::CTRL) && c == "w" {
+          let char_str = c.as_str().to_lowercase();
+          if modifiers.contains(keyboard::Modifiers::CTRL) && char_str == "w" {
             (event::Status::Captured, Some(Message::CloseTab(0, true)))
-          } else if modifiers.contains(keyboard::Modifiers::CTRL) && c == "t" {
+          } else if modifiers.contains(keyboard::Modifiers::CTRL) && char_str == "t" {
             (event::Status::Captured, Some(Message::NewTab))
+          } else if modifiers.contains(keyboard::Modifiers::CTRL)
+            && modifiers.contains(keyboard::Modifiers::SHIFT)
+            && char_str == "r"
+          {
+            (
+              event::Status::Captured,
+              Some(Message::Reload(
+                self.active_tab_index,
+                self.url.clone(),
+                None,
+                true,
+              )),
+            )
+          } else if modifiers.contains(keyboard::Modifiers::CTRL) && char_str == "r" {
+            (
+              event::Status::Captured,
+              Some(Message::Reload(
+                self.active_tab_index,
+                self.url.clone(),
+                None,
+                false,
+              )),
+            )
           } else if modifiers.is_empty() {
             if let Some(ch) = c.chars().next() {
               (event::Status::Captured, Some(Message::KeyPressed(ch)))

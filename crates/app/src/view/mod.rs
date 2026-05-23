@@ -191,6 +191,8 @@ impl Browser {
       display_list: &active_tab.display_list,
       scroll_offset: active_tab.scroll_offset,
       max_y: active_tab.max_y,
+      active_tab_index: self.active_tab_index,
+      url: active_tab.url.clone(),
     };
 
     let content = Canvas::new(browser_canvas)
