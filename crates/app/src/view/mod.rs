@@ -195,9 +195,39 @@ impl Browser {
       .push(
         TextInput::new("Enter URL...", &self.address_bar_text)
           .on_input(Message::AddressInputChanged)
-          .on_submit(Message::NavigateTo(self.address_bar_text.clone())),
+          .on_submit(Message::NavigateTo(self.address_bar_text.clone(), None)),
       )
       .push(bookmark_btn);
+
+    let mut ui_column = Column::new().push(title_bar).push(address_bar);
+
+    // Resubmission Dialog
+    if self.pending_resubmit_index.is_some() {
+      let resubmit_dialog = Container::new(
+        Row::new()
+          .spacing(15)
+          .align_y(iced::Alignment::Center)
+          .push(
+            Text::new("\u{F333}")
+              .font(ICONS)
+              .color(Color::from_rgb(1.0, 0.2, 0.2)),
+          )
+          .push(
+            Text::new("This page asks to resubmit form data. Resubmit?")
+              .color(Color::from_rgb(1.0, 0.2, 0.2)),
+          )
+          .push(Button::new(Text::new("Yes")).on_press(Message::ConfirmResubmit(true)))
+          .push(Button::new(Text::new("No")).on_press(Message::ConfirmResubmit(false))),
+      )
+      .padding(8)
+      .width(Length::Fill)
+      .style(|_theme| iced::widget::container::Style {
+        background: Some(Color::from_rgb8(45, 30, 30).into()),
+        ..Default::default()
+      });
+
+      ui_column = ui_column.push(resubmit_dialog);
+    }
 
     // Canvas rendering
     let browser_canvas = BrowserCanvas {
@@ -219,19 +249,16 @@ impl Browser {
       }
     }
 
-    // Final Combine
-    Column::new()
-      .push(title_bar)
-      .push(address_bar)
-      .push(
-        Container::new(content)
-          .width(Length::Fill)
-          .height(Length::Fill)
-          .style(move |_theme| iced::widget::container::Style {
-            background: Some(canvas_bg_color.into()),
-            ..Default::default()
-          }),
-      )
-      .into()
+    ui_column = ui_column.push(
+      Container::new(content)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(move |_theme| iced::widget::container::Style {
+          background: Some(canvas_bg_color.into()),
+          ..Default::default()
+        }),
+    );
+
+    ui_column.into()
   }
 }

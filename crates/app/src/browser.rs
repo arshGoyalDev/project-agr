@@ -12,6 +12,7 @@ pub struct Browser {
   pub height: f32,
   pub bookmarks: Vec<String>,
   pub cursor_blink_visible: bool,
+  pub pending_resubmit_index: Option<usize>,
 }
 
 impl Browser {
@@ -39,6 +40,7 @@ impl Browser {
         height: 600.0,
         bookmarks: Vec::new(),
         cursor_blink_visible: true,
+        pending_resubmit_index: None,
       },
       Task::batch(vec![load_font_task, load_url_task]),
     )

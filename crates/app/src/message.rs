@@ -12,7 +12,7 @@ pub enum Message {
   FontLoaded(Result<(), iced::font::Error>),
 
   // Navigation
-  NavigateTo(String),
+  NavigateTo(String, Option<String>),
   LoadUrl(usize, String, Option<String>, bool, bool),
   HtmlFetched(usize, String, bool, Result<String, String>, bool, bool),
   CssFetched(usize, Vec<String>),
@@ -21,6 +21,8 @@ pub enum Message {
   GoForward,
   ScrollToFragment(String),
   ToggleBookmark,
+  ShowResubmitDialog(usize),
+  ConfirmResubmit(bool),
 
   // Tab Management
   NewTab,

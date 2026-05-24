@@ -4,9 +4,15 @@ use layout::{DisplayList, DocumentLayout};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[derive(Clone, Debug)]
+pub struct HistoryEntry {
+  pub url: String,
+  pub payload: Option<String>,
+}
+
 pub struct Tab {
   pub url: String,
-  pub history: Vec<String>,
+  pub history: Vec<HistoryEntry>,
   pub history_index: usize,
   pub tree: Option<Rc<RefCell<Node>>>,
   pub document: Option<DocumentLayout>,
@@ -21,7 +27,10 @@ impl Tab {
   pub fn new(url: String) -> Self {
     Self {
       url: url.clone(),
-      history: vec![url],
+      history: vec![HistoryEntry {
+        url: url.clone(),
+        payload: None,
+      }],
       history_index: 0,
       tree: None,
       document: None,
@@ -95,6 +104,10 @@ impl Tab {
           );
           break;
         }
+      }
+
+      if let Some(method) = form_method.clone() {
+        println!("form_method: {}", method);
       }
 
       current = match &*node {

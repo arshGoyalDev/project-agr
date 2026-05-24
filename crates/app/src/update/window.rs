@@ -123,14 +123,14 @@ pub fn enter_pressed(browser: &mut Browser) -> Task<Message> {
       } else {
         format!("{}?{}", resolved, payload)
       };
-      
+
       return Task::done(Message::LoadUrl(
         browser.active_tab_index,
         final_url,
         None,
         false,
         false,
-      )); 
+      ));
     } else {
       return Task::done(Message::LoadUrl(
         browser.active_tab_index,
@@ -138,7 +138,7 @@ pub fn enter_pressed(browser: &mut Browser) -> Task<Message> {
         Some(payload),
         false,
         false,
-      ));      
+      ));
     }
   }
 
@@ -227,12 +227,12 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
   if let Some(href) = clicked_href {
     println!("Clicked link: {}", href);
     if href.starts_with('#') {
-      return Task::done(Message::NavigateTo(href));
+      return Task::done(Message::NavigateTo(href, None));
     }
     let mut url_handler = URLHandler::default();
     url_handler.init(browser.tabs[browser.active_tab_index].url.clone(), false);
     let resolved = url_handler.resolve(&href);
-    return Task::done(Message::NavigateTo(resolved));
+    return Task::done(Message::NavigateTo(resolved, None));
   } else if let Some(input_node) = clicked_input {
     {
       let mut borrow = input_node.borrow_mut();
@@ -260,22 +260,10 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
       } else {
         format!("{}?{}", resolved, payload)
       };
-      
-      return Task::done(Message::LoadUrl(
-        browser.active_tab_index,
-        final_url,
-        None,
-        false,
-        false,
-      )); 
+
+      return Task::done(Message::NavigateTo(final_url, None));
     } else {
-      return Task::done(Message::LoadUrl(
-        browser.active_tab_index,
-        resolved,
-        Some(payload),
-        false,
-        false,
-      ));      
+      return Task::done(Message::NavigateTo(resolved, Some(payload)));
     }
   }
 

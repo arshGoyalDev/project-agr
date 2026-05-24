@@ -38,7 +38,7 @@ impl Browser {
 
       // Navigation
       Message::ToggleBookmark => navigation::toggle_bookmark(self),
-      Message::NavigateTo(url) => navigation::navigate_to(self, url),
+      Message::NavigateTo(url, payload) => navigation::navigate_to(self, url, payload),
       Message::GoBack => navigation::go_back(self),
       Message::GoForward => navigation::go_forward(self),
       Message::LoadUrl(tab_index, url, payload, reload, hard_reload) => {
@@ -62,6 +62,8 @@ impl Browser {
         loading::css_fetched(self, tab_index, css_bodies)
       }
       Message::ScrollToFragment(id) => navigation::scroll_to_fragment(self, id),
+      Message::ShowResubmitDialog(index) => navigation::show_resubmit(self, index),
+      Message::ConfirmResubmit(confirm) => navigation::confirm_resubmit(self, confirm),
     }
   }
 }

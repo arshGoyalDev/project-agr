@@ -1,9 +1,10 @@
 use crate::browser::Browser;
 use crate::message::Message;
 use crate::net::fetch_html_task;
+use crate::tab::HistoryEntry;
 use iced::Task;
 
-pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
+pub fn navigate_to(browser: &mut Browser, url: String, payload: Option<String>) -> Task<Message> {
   let active_tab = &browser.tabs[browser.active_tab_index];
   let current_url = active_tab.url.clone();
 
@@ -30,8 +31,11 @@ pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
     browser.address_bar_text = final_url.clone();
 
     tab.history.truncate(tab.history_index + 1);
-    if tab.history.last() != Some(&final_url) {
-      tab.history.push(final_url);
+    if tab.history.last().map(|e| e.url.as_str()) != Some(&final_url.as_str()) {
+      tab.history.push(HistoryEntry {
+        url: final_url,
+        payload: None,
+      });
       tab.history_index = tab.history.len() - 1;
     }
 
@@ -39,17 +43,18 @@ pub fn navigate_to(browser: &mut Browser, url: String) -> Task<Message> {
   }
 
   let tab = &mut browser.tabs[browser.active_tab_index];
-  tab.history.truncate(tab.history_index + 1);
 
-  if tab.history.last() != Some(&final_url) {
-    tab.history.push(final_url.clone());
-    tab.history_index = tab.history.len() - 1;
-  }
+  tab.history.truncate(tab.history_index + 1);
+  tab.history.push(HistoryEntry {
+    url: final_url.clone(),
+    payload: payload.clone(),
+  });
+  tab.history_index = tab.history.len() - 1;
 
   Task::done(Message::LoadUrl(
     browser.active_tab_index,
     final_url,
-    None,
+    payload,
     true,
     false,
   ))
@@ -71,15 +76,21 @@ pub fn go_back(browser: &mut Browser) -> Task<Message> {
   let tab = &mut browser.tabs[browser.active_tab_index];
 
   if tab.history_index > 0 {
-    tab.history_index -= 1;
-    let prev_url = tab.history[tab.history_index].clone();
-    return Task::done(Message::LoadUrl(
-      browser.active_tab_index,
-      prev_url,
-      None,
-      false,
-      false,
-    ));
+    let prev_entry = &tab.history[tab.history_index - 1];
+
+    if prev_entry.payload.is_some() {
+      return Task::done(Message::ShowResubmitDialog(tab.history_index - 1));
+    } else {
+      tab.history_index -= 1;
+      let prev_url = tab.history[tab.history_index].url.clone();
+      return Task::done(Message::LoadUrl(
+        browser.active_tab_index,
+        prev_url,
+        None,
+        false,
+        false,
+      ));
+    }
   }
 
   Task::none()
@@ -89,15 +100,47 @@ pub fn go_forward(browser: &mut Browser) -> Task<Message> {
   let tab = &mut browser.tabs[browser.active_tab_index];
 
   if tab.history_index + 1 < tab.history.len() {
-    tab.history_index += 1;
-    let next_url = tab.history[tab.history_index].clone();
-    return Task::done(Message::LoadUrl(
-      browser.active_tab_index,
-      next_url,
-      None,
-      false,
-      false,
-    ));
+    let next_entry = &tab.history[tab.history_index + 1];
+
+    if next_entry.payload.is_some() {
+      return Task::done(Message::ShowResubmitDialog(tab.history_index + 1));
+    } else {
+      tab.history_index += 1;
+      let next_url = tab.history[tab.history_index].url.clone();
+      return Task::done(Message::LoadUrl(
+        browser.active_tab_index,
+        next_url,
+        None,
+        false,
+        false,
+      ));
+    }
+  }
+
+  Task::none()
+}
+
+pub fn show_resubmit(browser: &mut Browser, index: usize) -> Task<Message> {
+  browser.pending_resubmit_index = Some(index);
+  Task::none()
+}
+
+pub fn confirm_resubmit(browser: &mut Browser, confirm: bool) -> Task<Message> {
+  if confirm {
+    if let Some(index) = browser.pending_resubmit_index.take() {
+      let tab = &mut browser.tabs[browser.active_tab_index];
+      tab.history_index = index;
+      let target_entry = tab.history[index].clone();
+      return Task::done(Message::LoadUrl(
+        browser.active_tab_index,
+        target_entry.url,
+        target_entry.payload,
+        false,
+        false,
+      ));
+    }
+  } else {
+    browser.pending_resubmit_index = None;
   }
 
   Task::none()

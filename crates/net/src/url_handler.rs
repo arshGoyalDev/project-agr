@@ -306,11 +306,7 @@ impl URLHandler {
         ("Accept-Encoding", "gzip"),
       ];
 
-      let method = if payload.is_some_and(|p| !p.is_empty()) {
-        "POST"
-      } else {
-        "GET"
-      };
+      let method = if payload.is_some() { "POST" } else { "GET" };
       let mut request = format!("{} {} HTTP/1.1\r\n", method, self.path);
 
       for (header, value) in &headers {
