@@ -137,7 +137,7 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
             Some(Message::Click(cursor_position.x, cursor_position.y)),
           );
         }
-        (event::Status::Ignored, None)
+        (event::Status::Ignored, Some(Message::TabBlur))
       }
       _ => (event::Status::Ignored, None),
     }

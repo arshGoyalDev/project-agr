@@ -47,6 +47,20 @@ impl Tab {
     }
   }
 
+  pub fn blur(&mut self) -> bool {
+    if let Some(focused) = self.focus.take() {
+      let mut node = focused.borrow_mut();
+
+      if let Node::Element(elt) = &mut *node {
+        elt.attributes.remove("data-focused");
+        elt.attributes.remove("data-cursor-visible");
+      }
+      true
+    } else {
+      false
+    }
+  }
+
   pub fn backspace(&mut self) {
     if let Some(focused) = &self.focus {
       let mut node = focused.borrow_mut();
@@ -61,9 +75,10 @@ impl Tab {
     }
   }
 
-  pub fn submit_form(&mut self, start_node: Rc<RefCell<Node>>) -> Option<(String, String)> {
+  pub fn submit_form(&mut self, start_node: Rc<RefCell<Node>>) -> Option<(String, String, String)> {
     let mut current = Some(start_node);
     let mut form_action = None;
+    let mut form_method = None;
 
     while let Some(node_rc) = current {
       let node = node_rc.borrow();
@@ -71,6 +86,13 @@ impl Tab {
       if let Node::Element(elt) = &*node {
         if elt.tag == "form" {
           form_action = elt.attributes.get("action").cloned();
+          form_method = Some(
+            elt
+              .attributes
+              .get("method")
+              .cloned()
+              .unwrap_or_else(|| "GET".to_string()),
+          );
           break;
         }
       }
@@ -101,7 +123,8 @@ impl Tab {
         }
       }
 
-      return Some((action, payload));
+      let method = form_method.unwrap().to_uppercase();
+      return Some((action, payload, method));
     }
 
     None

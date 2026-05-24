@@ -34,4 +34,5 @@ pub enum Message {
   BackspacePressed,
   BlinkCursor,
   EnterPressed,
+  TabBlur,
 }

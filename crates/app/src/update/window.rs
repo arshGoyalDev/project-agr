@@ -36,6 +36,9 @@ pub fn scroll_changed(browser: &mut Browser, offset: f32) -> Task<Message> {
 
 pub fn address_input_changed(browser: &mut Browser, text: String) -> Task<Message> {
   browser.address_bar_text = text;
+  if browser.tabs[browser.active_tab_index].blur() {
+    browser.relayout();
+  }
   Task::none()
 }
 
@@ -70,6 +73,14 @@ pub fn blink_cursor(browser: &mut Browser) -> Task<Message> {
   Task::none()
 }
 
+pub fn tab_blur(browser: &mut Browser) -> Task<Message> {
+  if browser.tabs[browser.active_tab_index].blur() {
+    browser.relayout();
+  }
+
+  Task::none()
+}
+
 pub fn key_pressed(browser: &mut Browser, c: char) -> Task<Message> {
   browser.tabs[browser.active_tab_index].keypress(c);
 
@@ -97,20 +108,38 @@ pub fn enter_pressed(browser: &mut Browser) -> Task<Message> {
     }
   }
 
-  if let Some((action, payload)) = form_submission {
+  if let Some((action, payload, method)) = form_submission {
     let mut url_handler = URLHandler::default();
 
     url_handler.init(browser.tabs[browser.active_tab_index].url.clone(), false);
 
     let resolved = url_handler.resolve(&action);
 
-    return Task::done(Message::LoadUrl(
-      browser.active_tab_index,
-      resolved,
-      Some(payload),
-      false,
-      false,
-    ));
+    if method == "GET" {
+      let final_url = if payload.is_empty() {
+        resolved
+      } else if resolved.contains('?') {
+        format!("{}&{}", resolved, payload)
+      } else {
+        format!("{}?{}", resolved, payload)
+      };
+      
+      return Task::done(Message::LoadUrl(
+        browser.active_tab_index,
+        final_url,
+        None,
+        false,
+        false,
+      )); 
+    } else {
+      return Task::done(Message::LoadUrl(
+        browser.active_tab_index,
+        resolved,
+        Some(payload),
+        false,
+        false,
+      ));      
+    }
   }
 
   Task::none()
@@ -146,14 +175,7 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
 
     if let Some(doc) = &active_tab.document {
       if let Some(mut current_node) = doc.get_node(x, abs_y) {
-        if let Some(prev_node) = active_tab.focus.take() {
-          {
-            let mut prev_borrow = prev_node.borrow_mut();
-            if let Node::Element(e) = &mut *prev_borrow {
-              e.attributes.remove("data-focused");
-              e.attributes.remove("data-cursor-visible");
-            }
-          }
+        if active_tab.blur() {
           relayout_needed = true;
         }
 
@@ -195,14 +217,7 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
           form_submission = active_tab.submit_form(button_node);
         }
       } else {
-        if let Some(prev_node) = active_tab.focus.take() {
-          {
-            let mut prev_borrow = prev_node.borrow_mut();
-            if let Node::Element(e) = &mut *prev_borrow {
-              e.attributes.remove("data-focused");
-              e.attributes.remove("data-cursor-visible");
-            }
-          }
+        if active_tab.blur() {
           relayout_needed = true;
         }
       }
@@ -232,18 +247,36 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
     browser.tabs[browser.active_tab_index].focus = Some(input_node);
     browser.relayout();
     return Task::none();
-  } else if let Some((action, payload)) = form_submission {
+  } else if let Some((action, payload, method)) = form_submission {
     let mut url_handler = URLHandler::default();
     url_handler.init(browser.tabs[browser.active_tab_index].url.clone(), false);
     let resolved = url_handler.resolve(&action);
 
-    return Task::done(Message::LoadUrl(
-      browser.active_tab_index,
-      resolved,
-      Some(payload),
-      false,
-      false,
-    ));
+    if method == "GET" {
+      let final_url = if payload.is_empty() {
+        resolved
+      } else if resolved.contains('?') {
+        format!("{}&{}", resolved, payload)
+      } else {
+        format!("{}?{}", resolved, payload)
+      };
+      
+      return Task::done(Message::LoadUrl(
+        browser.active_tab_index,
+        final_url,
+        None,
+        false,
+        false,
+      )); 
+    } else {
+      return Task::done(Message::LoadUrl(
+        browser.active_tab_index,
+        resolved,
+        Some(payload),
+        false,
+        false,
+      ));      
+    }
   }
 
   if relayout_needed {

@@ -170,13 +170,18 @@ impl Browser {
 
     let is_bookmarked = self.bookmarks.contains(&active_tab.url);
     let bookmark_btn = Button::new(
-      Text::new(if is_bookmarked { "\u{F586}" } else { "\u{F588}" }).font(ICONS)
-        .size(14.0)
-        .color(if is_bookmarked {
-          Color::from_rgb8(255, 215, 0)
-        } else {
-          Color::WHITE
-        }),
+      Text::new(if is_bookmarked {
+        "\u{F586}"
+      } else {
+        "\u{F588}"
+      })
+      .font(ICONS)
+      .size(14.0)
+      .color(if is_bookmarked {
+        Color::from_rgb8(255, 215, 0)
+      } else {
+        Color::WHITE
+      }),
     )
     .style(button::text)
     .on_press(Message::ToggleBookmark);

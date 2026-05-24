@@ -27,6 +27,7 @@ impl Browser {
       Message::BackspacePressed => window::backspace_pressed(self),
       Message::BlinkCursor => window::blink_cursor(self),
       Message::EnterPressed => window::enter_pressed(self),
+      Message::TabBlur => window::tab_blur(self),
 
       // Tab Management
       Message::TabHovered(index) => tabs::tab_hovered(self, index),
