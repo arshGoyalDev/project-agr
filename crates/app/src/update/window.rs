@@ -124,21 +124,9 @@ pub fn enter_pressed(browser: &mut Browser) -> Task<Message> {
         format!("{}?{}", resolved, payload)
       };
 
-      return Task::done(Message::LoadUrl(
-        browser.active_tab_index,
-        final_url,
-        None,
-        false,
-        false,
-      ));
+      return Task::done(Message::NavigateTo(final_url, None));
     } else {
-      return Task::done(Message::LoadUrl(
-        browser.active_tab_index,
-        resolved,
-        Some(payload),
-        false,
-        false,
-      ));
+      return Task::done(Message::NavigateTo(resolved, Some(payload)));
     }
   }
 

@@ -55,7 +55,7 @@ pub fn navigate_to(browser: &mut Browser, url: String, payload: Option<String>) 
     browser.active_tab_index,
     final_url,
     payload,
-    true,
+    false,
     false,
   ))
 }
