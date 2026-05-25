@@ -180,6 +180,11 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
           );
           frame.fill(&rect, r.color);
         }
+        DrawCommand::Circle(c) => {
+          let screen_y = c.cy - self.scroll_offset;
+          let circle = canvas::Path::circle(Point::new(c.cx, screen_y), c.radius);
+          frame.fill(&circle, c.color);
+        }
       }
     }
 

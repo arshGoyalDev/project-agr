@@ -6,6 +6,9 @@ use crate::message::Message;
 use html_parser::Node;
 use net::URLHandler;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 pub fn title_bar_pressed() -> Task<Message> {
   window::get_oldest().and_then(window::drag)
 }
@@ -149,6 +152,30 @@ pub fn backspace_pressed(browser: &mut Browser) -> Task<Message> {
   Task::none()
 }
 
+fn clear_all_radios(node_rc: &Rc<RefCell<Node>>, target_name: &str) {
+  {
+    let mut node = node_rc.borrow_mut();
+    if let Node::Element(e) = &mut *node {
+      if e.tag == "input"
+        && e.attributes.get("type").map(|s| s.trim().to_lowercase()) == Some("radio".to_string())
+      {
+        if e.attributes.get("name").map(|s| s.as_str()) == Some(target_name) {
+          e.attributes.remove("checked");
+        }
+      }
+    }
+  }
+
+  let children = {
+    let node = node_rc.borrow();
+    node.children().iter().map(Rc::clone).collect::<Vec<_>>()
+  };
+
+  for child in children {
+    clear_all_radios(&child, target_name);
+  }
+}
+
 pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
   let offset = browser.tabs[browser.active_tab_index].scroll_offset;
   let abs_y = y + offset;
@@ -178,7 +205,6 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
                   clicked_href = Some(href.clone());
                 }
               } else if e.tag == "input" {
-                // e.attributes.insert("value".to_string(), "".to_string());
                 clicked_input = Some(current_node.clone());
               } else if e.tag == "button" {
                 clicked_button = Some(current_node.clone());
@@ -222,6 +248,50 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
     let resolved = url_handler.resolve(&href);
     return Task::done(Message::NavigateTo(resolved, None));
   } else if let Some(input_node) = clicked_input {
+
+    let mut input_type = String::new();
+    let mut input_name = None;
+
+    {
+      let borrow = input_node.borrow_mut();
+      if let Node::Element(elt) = &*borrow {
+        input_type = elt
+          .attributes
+          .get("type")
+          .cloned()
+          .unwrap_or_else(|| "text".to_string());
+        input_name = elt.attributes.get("name").cloned();
+      }
+    }
+
+    if input_type == "checkbox" || input_type == "radio" {
+      if input_type == "radio" {
+        if let Some(name) = &input_name {
+          if let Some(tree) = &browser.tabs[browser.active_tab_index].tree {
+            clear_all_radios(tree, name);
+          }
+        }
+        let mut borrow = input_node.borrow_mut();
+        if let Node::Element(e) = &mut *borrow {
+          e.attributes
+            .insert("checked".to_string(), "true".to_string());
+        }
+      } else if input_type == "checkbox" {
+        let mut borrow = input_node.borrow_mut();
+        if let Node::Element(e) = &mut *borrow {
+          if e.attributes.contains_key("checked") {
+            e.attributes.remove("checked");
+          } else {
+            e.attributes
+              .insert("checked".to_string(), "true".to_string());
+          }
+        }
+      }
+
+      browser.relayout();
+      return Task::none();
+    }
+
     {
       let mut borrow = input_node.borrow_mut();
       if let Node::Element(e) = &mut *borrow {

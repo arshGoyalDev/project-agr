@@ -149,9 +149,30 @@ fn find_inputs(node_rc: &Rc<RefCell<Node>>, inputs: &mut Vec<(String, String)>) 
 
   if let Node::Element(elt) = &*node {
     if elt.tag == "input" {
-      if let Some(name) = elt.attributes.get("name") {
-        let value = elt.attributes.get("value").cloned().unwrap_or_default();
-        inputs.push((name.clone(), value));
+      let input_type = elt
+        .attributes
+        .get("type")
+        .map(|s| s.as_str())
+        .unwrap_or("text");
+
+      if input_type == "checkbox" || input_type == "radio" {
+        if elt.attributes.contains_key("checked")
+          || elt.attributes.get("checked").map(|s| s.as_str()) == Some("true")
+        {
+          if let Some(name) = elt.attributes.get("name") {
+            let value = elt
+              .attributes
+              .get("value")
+              .cloned()
+              .unwrap_or_else(|| "on".to_string());
+            inputs.push((name.clone(), value));
+          }
+        }
+      } else {
+        if let Some(name) = elt.attributes.get("name") {
+          let value = elt.attributes.get("value").cloned().unwrap_or_default();
+          inputs.push((name.clone(), value));
+        }
       }
     }
   }
