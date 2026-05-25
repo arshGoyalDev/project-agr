@@ -1,6 +1,6 @@
 use crate::display_list::DisplayList;
 use crate::input_layout::InputLayout;
-use crate::layout::{HSTEP, VSTEP, decode_entities};
+use crate::layout::{HSTEP, INPUT_WIDTH_PX, VSTEP, decode_entities};
 use crate::line_layout::{InlineLayout, LineLayout};
 use crate::text_layout::TextLayout;
 use html_parser::Node;
@@ -336,7 +336,6 @@ impl BlockLayout {
     self.needs_space = true;
   }
 
-  // --- NEW: Handle rendering inputs exactly like words! ---
   fn input(&mut self, node_rc: &Rc<RefCell<Node>>, font_cache: &mut HashMap<FontKey, Font>) {
     let node = node_rc.borrow();
     let style_map = node.style();
@@ -364,9 +363,22 @@ impl BlockLayout {
       .cloned()
       .unwrap_or_else(|| "sans-serif".to_string());
 
-    drop(node);
-
     let font = get_font(&family_str, weight, style, size, font_cache);
+
+    let mut input_type: Option<String> = None;
+
+    if let Node::Element(elt) = &*node_rc.borrow() {
+      input_type = Some(
+        elt
+          .attributes
+          .get("type")
+          .cloned()
+          .unwrap_or_else(|| "text".to_string()),
+      );
+    }
+
+    let is_checkable =
+      input_type.as_deref() == Some("checkbox") || input_type.as_deref() == Some("radio");
 
     // Get a space size to separate the input from adjacent text
     let make_paragraph = |content: &str| {
@@ -390,10 +402,26 @@ impl BlockLayout {
       0.0
     };
 
-    let input_width = crate::layout::INPUT_WIDTH_PX;
-    let input_height = size * 1.5; // Input box scales proportionally with font size
+    let input_width = style_map
+      .get("width")
+      .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok())
+      .map(|px| px * 0.75)
+      .unwrap_or_else(|| {
+        if is_checkable {
+          size * 1.2
+        } else {
+          INPUT_WIDTH_PX
+        }
+      });
 
-    // Line wrap logic
+    let input_height = style_map
+      .get("height")
+      .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok())
+      .map(|px| px * 0.75)
+      .unwrap_or_else(|| if is_checkable { size * 1.2 } else { size * 1.5 });
+
+    drop(node);
+
     if self.cursor_x + space_advance + input_width > self.width - HSTEP {
       self.flush();
       self.current_line.push(InlineLayout::Input(InputLayout {
@@ -404,6 +432,7 @@ impl BlockLayout {
         y: 0.0,
         width: input_width,
         height: input_height,
+        input_type,
       }));
       self.cursor_x += input_width;
     } else {
@@ -415,6 +444,7 @@ impl BlockLayout {
         y: 0.0,
         width: input_width,
         height: input_height,
+        input_type,
       }));
       self.cursor_x += space_advance + input_width;
     }

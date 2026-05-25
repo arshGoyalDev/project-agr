@@ -23,9 +23,19 @@ pub struct DrawRect {
 }
 
 #[derive(Debug, Clone)]
+pub struct DrawCircle {
+  pub cx: f32,
+  pub cy: f32,
+  pub radius: f32,
+  pub color: Color,
+  pub bottom: f32,
+}
+
+#[derive(Debug, Clone)]
 pub enum DrawCommand {
   Text(DrawText),
   Rect(DrawRect),
+  Circle(DrawCircle),
 }
 
 impl DrawCommand {
@@ -33,12 +43,14 @@ impl DrawCommand {
     match self {
       DrawCommand::Text(t) => t.y,
       DrawCommand::Rect(r) => r.y1,
+      DrawCommand::Circle(c) => c.cy - c.radius,
     }
   }
   pub fn bottom(&self) -> f32 {
     match self {
       DrawCommand::Text(t) => t.bottom,
       DrawCommand::Rect(r) => r.bottom,
+      DrawCommand::Circle(c) => c.bottom,
     }
   }
 }
@@ -74,6 +86,17 @@ impl DisplayList {
       y2,
       color,
       bottom: y2,
+    }));
+  }
+
+  pub fn add_circle(&mut self, cx: f32, cy: f32, radius: f32, color: Color) {
+    let bottom = cy + radius;
+    self.items.push(DrawCommand::Circle(DrawCircle {
+      cx,
+      cy,
+      radius,
+      color,
+      bottom,
     }));
   }
 
