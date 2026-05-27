@@ -6,7 +6,7 @@ use iced::{Task, window};
 use crate::browser::Browser;
 use crate::message::Message;
 
-use html_parser::{Node};
+use html_parser::Node;
 use net::URLHandler;
 
 use std::cell::RefCell;
@@ -320,7 +320,7 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
             clear_all_radios(&search_scope, name);
           }
         }
-        
+
         let mut borrow = input_node.borrow_mut();
         if let Node::Element(e) = &mut *borrow {
           e.attributes

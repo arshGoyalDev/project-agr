@@ -90,15 +90,15 @@ Supported value forms:
 - Hex:
   - `#rgb`
   - `#rrggbb`
-
-Unsupported:
-
+  - `#rgba`
+  - `#rrggbbaa`
 - `rgb()`
 - `rgba()`
 - `hsl()`
 - `hsla()`
-- `#rgba`
-- `#rrggbbaa`
+
+Unsupported:
+
 - most named CSS colors
 
 ### `background-color`
