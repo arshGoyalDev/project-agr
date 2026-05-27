@@ -23,10 +23,8 @@ impl Browser {
       Message::FontLoaded(_) => Task::none(),
 
       // Typing
-      Message::KeyPressed(c) => window::key_pressed(self, c),
-      Message::BackspacePressed => window::backspace_pressed(self),
+      Message::KeyPressed(key) => window::key_pressed(self, key),
       Message::BlinkCursor => window::blink_cursor(self),
-      Message::EnterPressed => window::enter_pressed(self),
       Message::TabBlur => window::tab_blur(self),
 
       // Tab Management

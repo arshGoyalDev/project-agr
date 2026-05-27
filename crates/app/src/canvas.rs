@@ -44,91 +44,52 @@ impl<'a> canvas::Program<Message> for BrowserCanvas<'a> {
         )
       }
       Event::Keyboard(keyboard_event) => match keyboard_event {
-        keyboard::Event::KeyPressed {
-          key: keyboard::Key::Character(c),
-          modifiers,
-          ..
-        } => {
-          let char_str = c.as_str().to_lowercase();
-          if modifiers.contains(keyboard::Modifiers::CTRL) && char_str == "w" {
-            (event::Status::Captured, Some(Message::CloseTab(0, true)))
-          } else if modifiers.contains(keyboard::Modifiers::CTRL) && char_str == "t" {
-            (event::Status::Captured, Some(Message::NewTab))
-          } else if modifiers.contains(keyboard::Modifiers::CTRL)
-            && modifiers.contains(keyboard::Modifiers::SHIFT)
-            && char_str == "r"
-          {
-            (
-              event::Status::Captured,
-              Some(Message::Reload(
-                self.active_tab_index,
-                self.url.clone(),
-                None,
-                true,
-              )),
-            )
-          } else if modifiers.contains(keyboard::Modifiers::CTRL) && char_str == "r" {
-            (
-              event::Status::Captured,
-              Some(Message::Reload(
-                self.active_tab_index,
-                self.url.clone(),
-                None,
-                false,
-              )),
-            )
-          } else if modifiers.is_empty() {
-            if let Some(ch) = c.chars().next() {
-              (event::Status::Captured, Some(Message::KeyPressed(ch)))
-            } else {
-              (event::Status::Ignored, None)
+        keyboard::Event::KeyPressed { key, modifiers, .. } => {
+          if modifiers.contains(keyboard::Modifiers::CTRL) {
+            match key.as_ref() {
+              keyboard::Key::Character("w") => {
+                return (event::Status::Captured, Some(Message::CloseTab(0, true)));
+              }
+              keyboard::Key::Character("t") => {
+                return (event::Status::Captured, Some(Message::NewTab));
+              }
+              keyboard::Key::Character("r") => {
+                let hard = modifiers.contains(keyboard::Modifiers::SHIFT);
+                return (
+                  event::Status::Captured,
+                  Some(Message::Reload(
+                    self.active_tab_index,
+                    self.url.clone(),
+                    None,
+                    hard,
+                  )),
+                );
+              }
+              _ => (),
             }
-          } else {
-            let new_offset = self.scroll_offset;
-            (
-              event::Status::Captured,
-              Some(Message::ScrollChanged(new_offset)),
-            )
+          }
+          match key {
+            keyboard::Key::Named(keyboard::key::Named::ArrowDown) => {
+              let total_content_height = self.max_y + 40.0;
+              let scrollable_limit = (total_content_height - bounds.height).max(0.0);
+              let new_offset = (self.scroll_offset + 20.0).min(scrollable_limit);
+
+              (
+                event::Status::Captured,
+                Some(Message::ScrollChanged(new_offset)),
+              )
+            }
+            keyboard::Key::Named(keyboard::key::Named::ArrowUp) => {
+              let new_offset = (self.scroll_offset - 20.0).max(0.0);
+              (
+                event::Status::Captured,
+                Some(Message::ScrollChanged(new_offset)),
+              )
+            }
+            _ => (event::Status::Captured, Some(Message::KeyPressed(key))),
           }
         }
-        keyboard::Event::KeyPressed {
-          key: keyboard::Key::Named(keyboard::key::Named::Enter),
-          ..
-        } => (event::Status::Captured, Some(Message::EnterPressed)),
-        keyboard::Event::KeyPressed {
-          key: keyboard::Key::Named(keyboard::key::Named::Backspace),
-          ..
-        } => (event::Status::Captured, Some(Message::BackspacePressed)),
-        keyboard::Event::KeyPressed {
-          key: keyboard::Key::Named(keyboard::key::Named::ArrowDown),
-          ..
-        } => {
-          let total_content_height = self.max_y + 40.0;
-          let scrollable_limit = (total_content_height - bounds.height).max(0.0);
-          let new_offset = (self.scroll_offset + 20.0).min(scrollable_limit);
-
-          (
-            event::Status::Captured,
-            Some(Message::ScrollChanged(new_offset)),
-          )
-        }
-        keyboard::Event::KeyPressed {
-          key: keyboard::Key::Named(keyboard::key::Named::ArrowUp),
-          ..
-        } => {
-          let new_offset = (self.scroll_offset - 20.0).max(0.0);
-          (
-            event::Status::Captured,
-            Some(Message::ScrollChanged(new_offset)),
-          )
-        }
-        _ => {
-          let new_offset = self.scroll_offset;
-          (
-            event::Status::Captured,
-            Some(Message::ScrollChanged(new_offset)),
-          )
-        }
+        _ => (event::Status::Ignored, None),
       },
       Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
         if let Some(cursor_position) = cursor.position_in(bounds) {

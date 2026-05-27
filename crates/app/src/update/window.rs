@@ -1,3 +1,6 @@
+use iced::keyboard::Key;
+use iced::keyboard::key::Named;
+
 use iced::{Task, window};
 
 use crate::browser::Browser;
@@ -84,23 +87,58 @@ pub fn tab_blur(browser: &mut Browser) -> Task<Message> {
   Task::none()
 }
 
-pub fn key_pressed(browser: &mut Browser, c: char) -> Task<Message> {
-  browser.tabs[browser.active_tab_index].keypress(c);
+pub fn key_pressed(browser: &mut Browser, key: Key) -> Task<Message> {
+  let mut needs_relayout = false;
 
-  browser.cursor_blink_visible = true;
-  if let Some(focus_node) = &browser.tabs[browser.active_tab_index].focus {
-    let mut borrow = focus_node.borrow_mut();
-    if let Node::Element(e) = &mut *borrow {
-      e.attributes
-        .insert("data-cursor-visible".to_string(), "true".to_string());
+  if browser.tabs[browser.active_tab_index].focus.is_some() {
+    let tab = &mut browser.tabs[browser.active_tab_index];
+
+    match key {
+      Key::Character(c) => {
+        for ch in c.as_str().chars() {
+          tab.keypress(ch);
+        }
+        needs_relayout = true;
+      }
+      Key::Named(Named::Backspace) => {
+        tab.backspace();
+        needs_relayout = true;
+      }
+      Key::Named(Named::Delete) => {
+        tab.delete();
+        needs_relayout = true;
+      }
+      Key::Named(Named::ArrowLeft) => {
+        tab.arrow_left();
+        needs_relayout = true;
+      }
+      Key::Named(Named::ArrowRight) => {
+        tab.arrow_right();
+        needs_relayout = true;
+      }
+      Key::Named(Named::Enter) => {
+        return enter_pressed(browser);
+      }
+      _ => {}
+    }
+
+    if needs_relayout {
+      browser.cursor_blink_visible = true;
+      if let Some(focus_node) = &browser.tabs[browser.active_tab_index].focus {
+        let mut borrow = focus_node.borrow_mut();
+        if let html_parser::Node::Element(e) = &mut *borrow {
+          e.attributes
+            .insert("data-cursor-visible".to_string(), "true".to_string());
+        }
+      }
+      browser.relayout();
     }
   }
 
-  browser.relayout();
   Task::none()
 }
 
-pub fn enter_pressed(browser: &mut Browser) -> Task<Message> {
+fn enter_pressed(browser: &mut Browser) -> Task<Message> {
   let mut form_submission = None;
 
   {
@@ -133,22 +171,6 @@ pub fn enter_pressed(browser: &mut Browser) -> Task<Message> {
     }
   }
 
-  Task::none()
-}
-
-pub fn backspace_pressed(browser: &mut Browser) -> Task<Message> {
-  browser.tabs[browser.active_tab_index].backspace();
-
-  browser.cursor_blink_visible = true;
-  if let Some(focus_node) = &browser.tabs[browser.active_tab_index].focus {
-    let mut borrow = focus_node.borrow_mut();
-    if let Node::Element(e) = &mut *borrow {
-      e.attributes
-        .insert("data-cursor-visible".to_string(), "true".to_string());
-    }
-  }
-
-  browser.relayout();
   Task::none()
 }
 
@@ -248,7 +270,6 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
     let resolved = url_handler.resolve(&href);
     return Task::done(Message::NavigateTo(resolved, None));
   } else if let Some(input_node) = clicked_input {
-
     let mut input_type = String::new();
     let mut input_name = None;
 

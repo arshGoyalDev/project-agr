@@ -45,13 +45,24 @@ impl Tab {
   pub fn keypress(&mut self, c: char) {
     if let Some(focused) = &self.focus {
       let mut node = focused.borrow_mut();
-
       if let Node::Element(elt) = &mut *node {
-        let value = elt
+        let value_str = elt.attributes.get("value").cloned().unwrap_or_default();
+        let mut pos = elt
           .attributes
-          .entry("value".to_string())
-          .or_insert_with(String::new);
-        value.push(c);
+          .get("data-cursor-pos")
+          .and_then(|s| s.parse::<usize>().ok())
+          .unwrap_or(value_str.chars().count());
+
+        let mut chars: Vec<char> = value_str.chars().collect();
+        pos = pos.min(chars.len());
+        chars.insert(pos, c);
+
+        elt
+          .attributes
+          .insert("value".to_string(), chars.into_iter().collect());
+        elt
+          .attributes
+          .insert("data-cursor-pos".to_string(), (pos + 1).to_string());
       }
     }
   }
@@ -73,13 +84,92 @@ impl Tab {
   pub fn backspace(&mut self) {
     if let Some(focused) = &self.focus {
       let mut node = focused.borrow_mut();
-
       if let Node::Element(elt) = &mut *node {
-        let value = elt
+        let value_str = elt.attributes.get("value").cloned().unwrap_or_default();
+        let mut pos = elt
           .attributes
-          .entry("value".to_string())
-          .or_insert_with(String::new);
-        value.pop();
+          .get("data-cursor-pos")
+          .and_then(|s| s.parse::<usize>().ok())
+          .unwrap_or(value_str.chars().count());
+
+        if pos > 0 {
+          let mut chars: Vec<char> = value_str.chars().collect();
+          pos = pos.min(chars.len());
+          chars.remove(pos - 1);
+
+          elt
+            .attributes
+            .insert("value".to_string(), chars.into_iter().collect());
+          elt
+            .attributes
+            .insert("data-cursor-pos".to_string(), (pos - 1).to_string());
+        }
+      }
+    }
+  }
+
+  pub fn delete(&mut self) {
+    if let Some(focused) = &self.focus {
+      let mut node = focused.borrow_mut();
+      if let Node::Element(elt) = &mut *node {
+        let value_str = elt.attributes.get("value").cloned().unwrap_or_default();
+        let pos = elt
+          .attributes
+          .get("data-cursor-pos")
+          .and_then(|s| s.parse::<usize>().ok())
+          .unwrap_or(value_str.chars().count());
+
+        let mut chars: Vec<char> = value_str.chars().collect();
+
+        if pos < chars.len() {
+          chars.remove(pos);
+
+          elt
+            .attributes
+            .insert("value".to_string(), chars.into_iter().collect());
+
+          elt
+            .attributes
+            .insert("data-cursor-pos".to_string(), pos.to_string());
+        }
+      }
+    }
+  }
+
+  pub fn arrow_left(&mut self) {
+    if let Some(focused) = &self.focus {
+      let mut node = focused.borrow_mut();
+      if let Node::Element(elt) = &mut *node {
+        let value_str = elt.attributes.get("value").cloned().unwrap_or_default();
+        let pos = elt
+          .attributes
+          .get("data-cursor-pos")
+          .and_then(|s| s.parse::<usize>().ok())
+          .unwrap_or(value_str.chars().count());
+        if pos > 0 {
+          elt
+            .attributes
+            .insert("data-cursor-pos".to_string(), (pos - 1).to_string());
+        }
+      }
+    }
+  }
+
+  pub fn arrow_right(&mut self) {
+    if let Some(focused) = &self.focus {
+      let mut node = focused.borrow_mut();
+      if let Node::Element(elt) = &mut *node {
+        let value_str = elt.attributes.get("value").cloned().unwrap_or_default();
+        let pos = elt
+          .attributes
+          .get("data-cursor-pos")
+          .and_then(|s| s.parse::<usize>().ok())
+          .unwrap_or(value_str.chars().count());
+        if pos < value_str.chars().count() {
+          elt
+            .attributes
+            .insert("data-cursor-pos".to_string(), (pos + 1).to_string());
+        }
       }
     }
   }

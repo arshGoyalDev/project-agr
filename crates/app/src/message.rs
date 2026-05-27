@@ -1,3 +1,5 @@
+use iced::keyboard;
+
 #[derive(Debug, Clone)]
 pub enum Message {
   // Window & Canvas Events
@@ -32,9 +34,7 @@ pub enum Message {
   TabUnhovered,
 
   // Typing
-  KeyPressed(char),
-  BackspacePressed,
+  KeyPressed(keyboard::Key),
   BlinkCursor,
-  EnterPressed,
   TabBlur,
 }
