@@ -572,12 +572,14 @@ impl BlockLayout {
   }
 
   pub fn paint(&self, cmds: &mut DisplayList) {
-    let node = self.node.borrow();
-    let bgcolor = node
-      .style()
-      .get("background-color")
-      .cloned()
-      .unwrap_or_else(|| "transparent".to_string());
+    let bgcolor = {
+      let node = self.node.borrow();
+      node
+        .style()
+        .get("background-color")
+        .cloned()
+        .unwrap_or_else(|| "transparent".to_string())
+    };
 
     if bgcolor != "transparent" {
       if let Some(color) = parse_css_color(&bgcolor) {
