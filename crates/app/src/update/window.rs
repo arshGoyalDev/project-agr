@@ -6,7 +6,7 @@ use iced::{Task, window};
 use crate::browser::Browser;
 use crate::message::Message;
 
-use html_parser::Node;
+use html_parser::{Node};
 use net::URLHandler;
 
 use std::cell::RefCell;
@@ -288,10 +288,39 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
     if input_type == "checkbox" || input_type == "radio" {
       if input_type == "radio" {
         if let Some(name) = &input_name {
+          let mut scope = None;
+          let mut current = Some(Rc::clone(&input_node));
+
+          while let Some(node_rc) = current {
+            let is_form = {
+              let node = node_rc.borrow();
+              if let Node::Element(elt) = &*node {
+                elt.tag == "form"
+              } else {
+                false
+              }
+            };
+
+            if is_form {
+              scope = Some(node_rc.clone());
+              break;
+            }
+
+            current = {
+              let node = node_rc.borrow();
+              match &*node {
+                Node::Element(elt) => elt.parent.as_ref().and_then(|w| w.upgrade()),
+                Node::Text(t) => t.parent.as_ref().and_then(|w| w.upgrade()),
+              }
+            }
+          }
+
           if let Some(tree) = &browser.tabs[browser.active_tab_index].tree {
-            clear_all_radios(tree, name);
+            let search_scope = scope.unwrap_or_else(|| Rc::clone(tree));
+            clear_all_radios(&search_scope, name);
           }
         }
+        
         let mut borrow = input_node.borrow_mut();
         if let Node::Element(e) = &mut *borrow {
           e.attributes
