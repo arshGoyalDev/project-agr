@@ -6,7 +6,16 @@ Cargo.lock
 .DS_Store
 
 *.css
+!browser.css
 *.html
 *.txt
 
 /server
+
+*.md
+
+!README.md
+!CSS_SUPPORT.md
+
+.codegraph
+.cursor

@@ -1,0 +1,13 @@
+pre { background-color: grey; }
+a { color: blue; }
+i { font-style: italic; }
+b { font-weight: bold; }
+small { font-size: 90%; }
+big { font-size: 110%; }
+code { font-family: monospace; }
+html, body, div, p, h1, h2, h3, h4, h5, h6, blockquote, pre, hr, form, fieldset, legend, details, summary, article, section, nav, aside, header, footer, main, figure, figcaption, hgroup, address, menu, dialog { display: block; }
+ul, ol, li, dl, dt, dd, Table, thead, tbody, tfoot, tr, colgroup, col, caption { display: block }
+template, script, style, meta, link, title { display: none }
+html {
+  background-color: white;
+}
