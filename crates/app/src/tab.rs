@@ -178,40 +178,55 @@ impl Tab {
     let mut current = Some(start_node);
     let mut form_action = None;
     let mut form_method = None;
+    let mut form_node = None;
 
     while let Some(node_rc) = current {
       let node = node_rc.borrow();
 
-      if let Node::Element(elt) = &*node {
-        if elt.tag == "form" {
-          form_action = elt.attributes.get("action").cloned();
-          form_method = Some(
-            elt
-              .attributes
-              .get("method")
-              .cloned()
-              .unwrap_or_else(|| "GET".to_string()),
-          );
-          break;
+      let is_form = {
+        if let Node::Element(elt) = &*node {
+          if elt.tag == "form" {
+            form_action = elt.attributes.get("action").cloned();
+            form_method = Some(
+              elt
+                .attributes
+                .get("method")
+                .cloned()
+                .unwrap_or_else(|| "GET".to_string()),
+            );
+            break;
+          } else {
+            false
+          }
+        } else {
+          false
         }
+      };
+
+      if is_form {
+        form_node = Some(node_rc.clone());
+        break;
       }
 
-      if let Some(method) = form_method.clone() {
-        println!("form_method: {}", method);
-      }
-
-      current = match &*node {
-        Node::Element(elt) => elt.parent.as_ref().and_then(|w| w.upgrade()),
-        Node::Text(t) => t.parent.as_ref().and_then(|w| w.upgrade()),
-      }
+      // if let Some(method) = form_method.clone() {
+      //   println!("form_method: {}", method);
+      // }
+      //
+      current = {
+        let node = node_rc.borrow();
+        match &*node {
+          Node::Element(elt) => elt.parent.as_ref().and_then(|w| w.upgrade()),
+          Node::Text(t) => t.parent.as_ref().and_then(|w| w.upgrade()),
+        }
+      };
     }
 
     if let Some(action) = form_action {
       let mut payload = String::new();
 
-      if let Some(root) = &self.tree {
+      if let Some(form) = form_node {
         let mut inputs = Vec::new();
-        find_inputs(root, &mut inputs);
+        find_inputs(&form, &mut inputs);
 
         for (name, value) in inputs {
           if !payload.is_empty() {
