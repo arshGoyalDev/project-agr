@@ -18,6 +18,7 @@ pub enum Message {
   LoadUrl(usize, String, Option<String>, bool, bool),
   HtmlFetched(usize, String, bool, Result<String, String>, bool, bool),
   CssFetched(usize, Vec<String>),
+  JsFetched(usize, Vec<String>),
   Reload(usize, String, Option<String>, bool),
   GoBack,
   GoForward,

@@ -1,9 +1,9 @@
 use iced::Task;
 
 use crate::browser::Browser;
-use crate::dom::{extract_title, find_inline_styles, find_stylesheet_links};
+use crate::dom::{extract_title, find_inline_styles, find_stylesheet_links, find_script_links};
 use crate::message::Message;
-use crate::net::fetch_css_task;
+use crate::net::{fetch_css_task, fetch_js_task};
 
 use css_parser::CSSParser;
 use css_parser::style;
@@ -32,24 +32,41 @@ pub fn html_fetched(
       let mut links = Vec::new();
       find_stylesheet_links(&tree, &mut links);
 
+      let mut scripts = Vec::new();
+      find_script_links(&tree, &mut scripts);
+
       tab.tree = Some(tree);
 
-      if links.is_empty() {
-        return Task::done(Message::CssFetched(tab_index, vec![]));
+      // Create the CSS Fetching Task
+      let css_task = if links.is_empty() {
+        Task::done(Message::CssFetched(tab_index, vec![]))
       } else {
-        return Task::perform(
-          fetch_css_task(links, base_url, reload, hard_reload),
+        Task::perform(
+          fetch_css_task(links, base_url.clone(), reload, hard_reload),
           move |bodies| Message::CssFetched(tab_index, bodies),
-        );
-      }
+        )
+      };
+
+      // Create the JS Fetching Task
+      let js_task = if scripts.is_empty() {
+        Task::done(Message::JsFetched(tab_index, vec![]))
+      } else {
+        Task::perform(
+          fetch_js_task(scripts, base_url.clone(), reload, hard_reload),
+          move |bodies| Message::JsFetched(tab_index, bodies),
+        )
+      };
+
+      // Run both tasks concurrently and return them
+      return Task::batch(vec![css_task, js_task]);
+
     } else {
       tab.title = String::from("Network Error");
     }
   }
-
+  
   Task::none()
 }
-
 pub fn css_fetched(
   browser: &mut Browser,
   tab_index: usize,
@@ -99,5 +116,13 @@ pub fn css_fetched(
     }
   }
 
+  Task::none()
+}
+
+pub fn js_fetched(_browser: &mut Browser, _tab_index: usize, js_bodies:Vec<String>) -> Task<Message> {
+  for body in js_bodies {
+    println!("{body}");
+  }
+  
   Task::none()
 }

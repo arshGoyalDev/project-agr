@@ -40,3 +40,27 @@ pub async fn fetch_css_task(
 
   css_bodies
 }
+
+pub async fn fetch_js_task(
+  scripts: Vec<String>,
+  base_url: String,
+  reload: bool,
+  hard_reload: bool,
+) -> Vec<String> {
+  let mut js_bodies = Vec::new();
+
+  for script in scripts {
+    let mut url_handler = net::URLHandler::default();
+    url_handler.init(base_url.clone(), false);
+    let resolved_url = url_handler.resolve(&script);
+
+    let mut url_handler = net::URLHandler::default();
+    url_handler.init(resolved_url, false);
+
+    if let Ok(js_body) = url_handler.request(None, reload, hard_reload) {
+      js_bodies.push(js_body);
+    }
+  }
+
+  js_bodies
+}
