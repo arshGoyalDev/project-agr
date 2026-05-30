@@ -12,5 +12,6 @@ net    = { path = "../net" }
 html-parser   = { path = "../html-parser" }
 css-parser = { path = "../css-parser" }
 layout = { path = "../layout" }
+js-bindings = {path = "../js-bindings"}
 iced       = { workspace = true }
 tokio      = { workspace = true }

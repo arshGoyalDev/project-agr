@@ -1,4 +1,5 @@
 use html_parser::Node;
+use js_bindings::JsRuntime;
 use layout::{DisplayList, DocumentLayout};
 
 use std::cell::RefCell;
@@ -21,6 +22,7 @@ pub struct Tab {
   pub max_y: f32,
   pub title: String,
   pub focus: Option<Rc<RefCell<Node>>>,
+  pub js_runtime: JsRuntime,
 }
 
 impl Tab {
@@ -39,11 +41,17 @@ impl Tab {
       max_y: 0.0,
       title: String::new(),
       focus: None,
+      js_runtime: JsRuntime::new(),
     }
   }
 
   pub fn keypress(&mut self, c: char) {
     if let Some(focused) = &self.focus {
+
+      if !self.js_runtime.dispatch_event("keydown", focused.clone()) {
+        return;
+      }
+      
       let mut node = focused.borrow_mut();
       if let Node::Element(elt) = &mut *node {
         let value_str = elt.attributes.get("value").cloned().unwrap_or_default();
@@ -208,10 +216,6 @@ impl Tab {
         break;
       }
 
-      // if let Some(method) = form_method.clone() {
-      //   println!("form_method: {}", method);
-      // }
-      //
       current = {
         let node = node_rc.borrow();
         match &*node {
@@ -225,6 +229,10 @@ impl Tab {
       let mut payload = String::new();
 
       if let Some(form) = form_node {
+        if !self.js_runtime.dispatch_event("submit", form.clone()) {
+          return None;
+        }
+        
         let mut inputs = Vec::new();
         find_inputs(&form, &mut inputs);
 

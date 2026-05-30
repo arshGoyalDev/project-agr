@@ -204,6 +204,7 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
 
   let mut clicked_href = None;
   let mut clicked_input = None;
+  let mut clicked_a_node = None;
   let mut form_submission = None;
   let mut relayout_needed = false;
 
@@ -225,6 +226,7 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
               if e.tag == "a" {
                 if let Some(href) = e.attributes.get("href") {
                   clicked_href = Some(href.clone());
+                  clicked_a_node = Some(current_node.clone());
                 }
               } else if e.tag == "input" {
                 clicked_input = Some(current_node.clone());
@@ -261,6 +263,15 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
   }
 
   if let Some(href) = clicked_href {
+    if let Some(node) = clicked_a_node {
+      if !browser.tabs[browser.active_tab_index]
+        .js_runtime
+        .dispatch_event("click", node)
+      {
+        return Task::none();
+      }
+    }
+
     println!("Clicked link: {}", href);
     if href.starts_with('#') {
       return Task::done(Message::NavigateTo(href, None));
@@ -270,6 +281,13 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
     let resolved = url_handler.resolve(&href);
     return Task::done(Message::NavigateTo(resolved, None));
   } else if let Some(input_node) = clicked_input {
+    if !browser.tabs[browser.active_tab_index]
+      .js_runtime
+      .dispatch_event("click", input_node.clone())
+    {
+      return Task::none();
+    }
+
     let mut input_type = String::new();
     let mut input_name = None;
 

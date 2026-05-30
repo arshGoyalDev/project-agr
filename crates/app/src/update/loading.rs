@@ -1,7 +1,7 @@
 use iced::Task;
 
 use crate::browser::Browser;
-use crate::dom::{extract_title, find_inline_styles, find_stylesheet_links, find_script_links};
+use crate::dom::{extract_title, find_inline_styles, find_script_links, find_stylesheet_links};
 use crate::message::Message;
 use crate::net::{fetch_css_task, fetch_js_task};
 
@@ -35,7 +35,8 @@ pub fn html_fetched(
       let mut scripts = Vec::new();
       find_script_links(&tree, &mut scripts);
 
-      tab.tree = Some(tree);
+      tab.tree = Some(tree.clone());
+      tab.js_runtime.set_dom_tree(tree.clone());
 
       // Create the CSS Fetching Task
       let css_task = if links.is_empty() {
@@ -59,12 +60,11 @@ pub fn html_fetched(
 
       // Run both tasks concurrently and return them
       return Task::batch(vec![css_task, js_task]);
-
     } else {
       tab.title = String::from("Network Error");
     }
   }
-  
+
   Task::none()
 }
 pub fn css_fetched(
@@ -119,10 +119,31 @@ pub fn css_fetched(
   Task::none()
 }
 
-pub fn js_fetched(_browser: &mut Browser, _tab_index: usize, js_bodies:Vec<String>) -> Task<Message> {
-  for body in js_bodies {
-    println!("{body}");
+pub fn js_fetched(
+  browser: &mut Browser,
+  tab_index: usize,
+  js_bodies: Vec<String>,
+) -> Task<Message> {
+  let mut needs_relayout = false;
+
+  if let Some(tab) = browser.tabs.get_mut(tab_index) {
+    for body in js_bodies {
+      if tab.js_runtime.run(&body) {
+        needs_relayout = true;
+      }
+    }
+
+    if needs_relayout {
+      if let Some(tree) = &tab.tree {
+        let width = browser.width;
+        let mut doc = DocumentLayout::new(&tree.clone());
+        doc.layout(width);
+        tab.display_list = doc.paint();
+        tab.max_y = tab.display_list.max_y();
+        tab.document = Some(doc);
+      }
+    }
   }
-  
+
   Task::none()
 }
