@@ -1,4 +1,8 @@
-use crate::bindings::{js_get_attribute, js_inner_html_set, js_log, js_query_selector_all};
+use crate::bindings::{
+  js_get_attribute, js_get_element_by_id, js_get_elements_by_class_name,
+  js_get_elements_by_tag_name, js_inner_html_set, js_log, js_node_children, js_query_selector,
+  js_query_selector_all
+};
 
 use boa_engine::object::ObjectInitializer;
 use boa_engine::property::Attribute;
@@ -42,6 +46,11 @@ impl JsRuntime {
         1,
       )
       .function(
+        NativeFunction::from_fn_ptr(js_query_selector),
+        JsString::from("querySelector"),
+        1,
+      )
+      .function(
         NativeFunction::from_fn_ptr(js_get_attribute),
         JsString::from("getAttribute"),
         2,
@@ -50,6 +59,26 @@ impl JsRuntime {
         NativeFunction::from_fn_ptr(js_inner_html_set),
         JsString::from("innerHTML_set"),
         2,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_node_children),
+        JsString::from("node_children"),
+        2,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_get_element_by_id),
+        JsString::from("getElementById"),
+        1,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_get_elements_by_class_name),
+        JsString::from("getElementsByClassName"),
+        1,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_get_elements_by_tag_name),
+        JsString::from("getElementsByTagName"),
+        1,
       )
       .build();
 
