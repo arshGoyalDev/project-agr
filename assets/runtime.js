@@ -10,7 +10,7 @@ function Node(handle) {
 
 document = {
   querySelectorAll: function (x) {
-    let handles = __rust__.querySelectorAll(s);
+    let handles = __rust__.querySelectorAll(x);
     return handles.map(function (h) {
       return new Node(h);
     });
@@ -42,7 +42,7 @@ Node.prototype.dispatchEvent = function (event) {
     list[i].call(this, event);
   }
 
-  return event.do_default();
+  return event.do_default;
 };
 
 Object.defineProperty(Node.prototype, "innerHTML", {
@@ -51,13 +51,11 @@ Object.defineProperty(Node.prototype, "innerHTML", {
   },
 });
 
-class Event {
-  constructor(type) {
-    this.type = type;
-    this.do_default = true;
-  }
+function Event(type) {
+  this.type = type;
+  this.do_default = true;
 }
 
 Event.prototype.preventDefault = function () {
   this.do_default = false;
-}
+};

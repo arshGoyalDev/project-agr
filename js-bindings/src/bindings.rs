@@ -7,12 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub fn js_log(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
-  let msg = args
-    .get(0)
-    .cloned()
-    .unwrap_or_default()
-    .display()
-    .to_string();
+  let msg = js_to_string(args.get(0));
 
   println!("[JS Log] {}", msg);
   Ok(JsValue::undefined())
@@ -23,12 +18,7 @@ pub fn js_query_selector_all(
   args: &[JsValue],
   ctx: &mut Context,
 ) -> JsResult<JsValue> {
-  let selector = args
-    .get(0)
-    .cloned()
-    .unwrap_or_default()
-    .display()
-    .to_string();
+  let selector = js_to_string(args.get(0));
   let mut handles = Vec::new();
 
   ACTIVE_DOM.with(|dom| {
@@ -57,18 +47,13 @@ pub fn js_query_selector_all(
     handles.into_iter().map(|h| JsValue::from(h)),
     ctx,
   );
-
   Ok(array.into())
 }
 
 pub fn js_get_attribute(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
   let handle = args.get(0).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
-  let attr = args
-    .get(1)
-    .cloned()
-    .unwrap_or_default()
-    .display()
-    .to_string();
+
+  let attr = js_to_string(args.get(1));
   let mut result = String::new();
 
   ACTIVE_DOM.with(|dom| {
@@ -88,12 +73,8 @@ pub fn js_get_attribute(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> Js
 
 pub fn js_inner_html_set(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
   let handle = args.get(0).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
-  let html = args
-    .get(1)
-    .cloned()
-    .unwrap_or_default()
-    .display()
-    .to_string();
+
+  let html = js_to_string(args.get(1));
 
   ACTIVE_DOM.with(|dom| {
     if let Some(state) = &*dom.borrow() {
@@ -161,5 +142,16 @@ fn find_nodes(node: &Rc<RefCell<Node>>, selector: &str, results: &mut Vec<Rc<Ref
   }
   for child in n.children() {
     find_nodes(child, selector, results);
+  }
+}
+
+fn js_to_string(val: Option<&JsValue>) -> String {
+  if let Some(v) = val {
+    if let Some(s) = v.as_string() {
+      return s.to_std_string_escaped();
+    }
+    v.display().to_string()
+  } else {
+    String::new()
   }
 }

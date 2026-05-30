@@ -184,6 +184,7 @@ pub fn load_url(
     }
     tab.title = String::from("Loading...");
     tab.display_list = layout::DisplayList::new();
+    tab.js_runtime = js_bindings::JsRuntime::new();
   }
 
   if url == "about:bookmarks" {

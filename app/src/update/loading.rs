@@ -76,7 +76,7 @@ pub fn css_fetched(
 
   if let Some(tab) = browser.tabs.get_mut(tab_index) {
     if let Some(tree) = &tab.tree {
-      let default_css = include_str!("../../../../assets/browser.css").to_string();
+      let default_css = include_str!("../../../assets/browser.css").to_string();
       let mut css_parser = CSSParser::new(&default_css);
       let mut rules = css_parser.parse();
 

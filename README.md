@@ -3,18 +3,18 @@
 `project-agr` is a small Rust browser experiment built as a workspace of focused crates:
 It is rust implementation of the browser in the book [Web Browser Engineering](https://browser.engineering/index.html)
 
-- `crates/net`: URL parsing, HTTP(S)/file/data loading, redirects, gzip, and an in-memory cache.
-- `crates/html-parser`: a forgiving DOM builder with implicit `html`/`head`/`body` insertion.
-- `crates/css-parser`: selector parsing, cascade priority, inherited defaults, and inline style application.
-- `crates/layout`: block/inline layout, text measurement, input/button painting, display list generation, and view-source highlighting.
-- `crates/app`: the `iced` desktop shell, tab state, navigation, history, bookmarks, click handling, and canvas rendering.
-- `server`: a tiny local guestbook server used for form-submission experiments.
+- `net`: URL parsing, HTTP(S)/file/data loading, redirects, gzip, and an in-memory cache.
+- `html-parser`: a forgiving DOM builder with implicit `html`/`head`/`body` insertion.
+- `css-parser`: selector parsing, cascade priority, inherited defaults, and inline style application.
+- `layout`: block/inline layout, text measurement, input/button painting, display list generation, and view-source highlighting.
+- `app`: the `iced` desktop shell, tab state, navigation, history, bookmarks, click handling, and canvas rendering.
+- `js-bindings`: runtime and bindings for DOM events and handlers and basic js functions
 
 The project is closer to a learning browser than a standards-compliant engine. It loads pages, builds a DOM, applies a small CSS subset, lays out text and simple form controls, and renders through a custom canvas display list.
 
 ## Workspace Layout
 
-### `crates/app`
+### `app`
 
 - `main.rs`: starts the `iced` application and disables native window decorations.
 - `browser.rs`: root browser state.
@@ -27,18 +27,18 @@ The project is closer to a learning browser than a standards-compliant engine. I
 - `update/*.rs`: behavior split by concern.
 - `view/mod.rs`: the visible browser UI.
 
-### `crates/html-parser`
+### `html-parser`
 
 - `node.rs`: DOM node model.
 - `parser.rs`: token-light HTML parser with implicit tag insertion and script/comment handling.
 
-### `crates/css-parser`
+### `css-parser`
 
 - `parser.rs`: CSS tokenization and rule parsing.
 - `selector.rs`: tag, class, id, and descendant selectors.
 - `style.rs`: cascade resolution and inherited property propagation.
 
-### `crates/layout`
+### `layout`
 
 - `document_layout.rs`: document root layout driver.
 - `block_layout.rs`: the main layout engine.
@@ -47,6 +47,15 @@ The project is closer to a learning browser than a standards-compliant engine. I
 - `display_list.rs`: abstract draw commands.
 - `layout.rs`: constants and HTML entity decoding.
 - `syntax_highlight.rs`: simple `view-source:` formatting.
+
+### `net`
+
+- `url_handler.rs`: URL parsing, HTTP(S)/file/data loading, redirects, gzip, and an in-memory cache
+
+### `js-bindings`
+
+- `runtime.rs`: initializes the dom state, and registers the js bindings
+- `binding.rs`: rust function bindings for js functions
 
 ### Supporting Files
 
@@ -62,6 +71,7 @@ The main runtime pipeline is:
 3. `loading::html_fetched` parses HTML into a DOM tree.
 4. Stylesheet links and inline `<style>` blocks are collected.
 5. `loading::css_fetched` loads `browser.css`, linked CSS, and inline CSS, then applies rules with `css_parser::style`.
+6. `loading::js_fetched` loads linked js, then use `JsRuntime` to execute the scripts
 6. `DocumentLayout::layout` builds layout boxes from the styled DOM.
 7. `DocumentLayout::paint` emits a `DisplayList`.
 8. `BrowserCanvas` renders the display list and handles scrolling, clicks, and typing events.
@@ -133,8 +143,19 @@ State is tab-local for DOM, layout, scroll offset, focus, title, and history. Ne
 - Form submission for GET and POST.
 - `view-source:` page rendering through simple escaped `<pre>` output.
 
+### JS
+
+- `console.log` for logging to stdout.
+- `document.querySelectorAll(selector)` returns a list of Node objects matching the CSS selector.
+- `node.getAttribute(attribute)` returns the value of the attribute on the element.
+- `node.innerHTML = htmlString` sets the inner HTML of the element (triggers relayout).
+- `new Node(handle)` is a constructor used internally by the bindings to wrap a DOM handle.
+- `document` is a global object with `querySelectorAll`.
+- `Event` constructor and `event.preventDefault()`.
+- `node.addEventListener(type, listener)` and `node.dispatchEvent(event)` for basic event handling.
+
 ## Current Behavior by Crate
- ### `net`
+### `net`
 
 `URLHandler` strips fragments before fetching, parses the scheme manually, supports `view-source:` as a wrapper scheme, and resolves relative links against the current page. Requests are synchronous. Cache entries keep the body, timestamp, `ETag`, `Last-Modified`, and optional `max-age`.
 
@@ -160,3 +181,9 @@ The app is an `iced` application with message routing split into:
 - `update/navigation.rs`: history, bookmarks, reload, fragment scrolling, and loading.
 - `update/loading.rs`: HTML/CSS parsing and final layout.
 - `update/tabs.rs`: tab lifecycle.
+
+### `js-bindings`
+
+The JS runtime provides a minimal DOM API for interaction between JavaScript and the Rust engine.
+
+See [JS_SUPPORT.md](/home/arshgoyal/Engineer/Developer/Rust/projects/project-agr/JS_SUPPORT.md) for the javascript support in more detail.

@@ -93,6 +93,12 @@ pub fn key_pressed(browser: &mut Browser, key: Key) -> Task<Message> {
   if browser.tabs[browser.active_tab_index].focus.is_some() {
     let tab = &mut browser.tabs[browser.active_tab_index];
 
+    if let Some(focused) = &tab.focus {
+      if !tab.js_runtime.dispatch_event("keydown", focused.clone()) {
+        return Task::none();
+      }
+    }
+
     match key {
       Key::Character(c) => {
         for ch in c.as_str().chars() {
@@ -136,66 +142,6 @@ pub fn key_pressed(browser: &mut Browser, key: Key) -> Task<Message> {
   }
 
   Task::none()
-}
-
-fn enter_pressed(browser: &mut Browser) -> Task<Message> {
-  let mut form_submission = None;
-
-  {
-    let active_tab = &mut browser.tabs[browser.active_tab_index];
-
-    if let Some(focus_node) = &active_tab.focus {
-      form_submission = active_tab.submit_form(focus_node.clone());
-    }
-  }
-
-  if let Some((action, payload, method)) = form_submission {
-    let mut url_handler = URLHandler::default();
-
-    url_handler.init(browser.tabs[browser.active_tab_index].url.clone(), false);
-
-    let resolved = url_handler.resolve(&action);
-
-    if method == "GET" {
-      let final_url = if payload.is_empty() {
-        resolved
-      } else if resolved.contains('?') {
-        format!("{}&{}", resolved, payload)
-      } else {
-        format!("{}?{}", resolved, payload)
-      };
-
-      return Task::done(Message::NavigateTo(final_url, None));
-    } else {
-      return Task::done(Message::NavigateTo(resolved, Some(payload)));
-    }
-  }
-
-  Task::none()
-}
-
-fn clear_all_radios(node_rc: &Rc<RefCell<Node>>, target_name: &str) {
-  {
-    let mut node = node_rc.borrow_mut();
-    if let Node::Element(e) = &mut *node {
-      if e.tag == "input"
-        && e.attributes.get("type").map(|s| s.trim().to_lowercase()) == Some("radio".to_string())
-      {
-        if e.attributes.get("name").map(|s| s.as_str()) == Some(target_name) {
-          e.attributes.remove("checked");
-        }
-      }
-    }
-  }
-
-  let children = {
-    let node = node_rc.borrow();
-    node.children().iter().map(Rc::clone).collect::<Vec<_>>()
-  };
-
-  for child in children {
-    clear_all_radios(&child, target_name);
-  }
 }
 
 pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
@@ -398,4 +344,66 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
   }
 
   Task::none()
+}
+
+// Helpers
+
+fn enter_pressed(browser: &mut Browser) -> Task<Message> {
+  let mut form_submission = None;
+
+  {
+    let active_tab = &mut browser.tabs[browser.active_tab_index];
+
+    if let Some(focus_node) = &active_tab.focus {
+      form_submission = active_tab.submit_form(focus_node.clone());
+    }
+  }
+
+  if let Some((action, payload, method)) = form_submission {
+    let mut url_handler = URLHandler::default();
+
+    url_handler.init(browser.tabs[browser.active_tab_index].url.clone(), false);
+
+    let resolved = url_handler.resolve(&action);
+
+    if method == "GET" {
+      let final_url = if payload.is_empty() {
+        resolved
+      } else if resolved.contains('?') {
+        format!("{}&{}", resolved, payload)
+      } else {
+        format!("{}?{}", resolved, payload)
+      };
+
+      return Task::done(Message::NavigateTo(final_url, None));
+    } else {
+      return Task::done(Message::NavigateTo(resolved, Some(payload)));
+    }
+  }
+
+  Task::none()
+}
+
+fn clear_all_radios(node_rc: &Rc<RefCell<Node>>, target_name: &str) {
+  {
+    let mut node = node_rc.borrow_mut();
+    if let Node::Element(e) = &mut *node {
+      if e.tag == "input"
+        && e.attributes.get("type").map(|s| s.trim().to_lowercase()) == Some("radio".to_string())
+      {
+        if e.attributes.get("name").map(|s| s.as_str()) == Some(target_name) {
+          e.attributes.remove("checked");
+        }
+      }
+    }
+  }
+
+  let children = {
+    let node = node_rc.borrow();
+    node.children().iter().map(Rc::clone).collect::<Vec<_>>()
+  };
+
+  for child in children {
+    clear_all_radios(&child, target_name);
+  }
 }

@@ -1,11 +1,11 @@
 [workspace]
 members = [
-  "crates/net",
-  "crates/html-parser",
-  "crates/css-parser",
-  "crates/layout",
-  "crates/app",
-  "crates/js-bindings"
+  "net",
+  "html-parser",
+  "css-parser",
+  "layout",
+  "app",
+  "js-bindings"
 ]
 resolver = "2"
 

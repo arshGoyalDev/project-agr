@@ -27,7 +27,7 @@ impl Browser {
     let load_url_task = Task::done(Message::LoadUrl(0, url.clone(), None, false, false));
 
     let load_font_task =
-      font::load(include_bytes!("../../../assets/bootstrap-icons.ttf").as_slice())
+      font::load(include_bytes!("../../assets/bootstrap-icons.ttf").as_slice())
         .map(Message::FontLoaded);
 
     (

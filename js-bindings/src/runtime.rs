@@ -53,8 +53,9 @@ impl JsRuntime {
       )
       .build();
 
-    let _ = context.register_global_property(JsString::from("__rust__"), rust_obj, Attribute::all());
-    let runtime_js = include_str!("runtime.js");
+    let _ =
+      context.register_global_property(JsString::from("__rust__"), rust_obj, Attribute::all());
+    let runtime_js = include_str!("../../assets/runtime.js");
     let _ = context.eval(Source::from_bytes(runtime_js));
 
     Self {

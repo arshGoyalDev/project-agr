@@ -47,11 +47,6 @@ impl Tab {
 
   pub fn keypress(&mut self, c: char) {
     if let Some(focused) = &self.focus {
-
-      if !self.js_runtime.dispatch_event("keydown", focused.clone()) {
-        return;
-      }
-      
       let mut node = focused.borrow_mut();
       if let Node::Element(elt) = &mut *node {
         let value_str = elt.attributes.get("value").cloned().unwrap_or_default();
@@ -202,7 +197,7 @@ impl Tab {
                 .cloned()
                 .unwrap_or_else(|| "GET".to_string()),
             );
-            break;
+            true
           } else {
             false
           }
@@ -232,7 +227,7 @@ impl Tab {
         if !self.js_runtime.dispatch_event("submit", form.clone()) {
           return None;
         }
-        
+
         let mut inputs = Vec::new();
         find_inputs(&form, &mut inputs);
 

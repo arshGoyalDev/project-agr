@@ -59,9 +59,7 @@ impl Browser {
       Message::CssFetched(tab_index, css_bodies) => {
         loading::css_fetched(self, tab_index, css_bodies)
       }
-      Message::JsFetched(tab_index, scripts) => {
-        loading::js_fetched(self, tab_index, scripts)
-      }
+      Message::JsFetched(tab_index, scripts) => loading::js_fetched(self, tab_index, scripts),
       Message::ScrollToFragment(id) => navigation::scroll_to_fragment(self, id),
       Message::ShowResubmitDialog(index) => navigation::show_resubmit(self, index),
       Message::ConfirmResubmit(confirm) => navigation::confirm_resubmit(self, confirm),

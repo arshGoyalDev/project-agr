@@ -51,9 +51,9 @@ pub fn find_script_links(node_rc: &Rc<RefCell<Node>>, scripts: &mut Vec<String>)
 
   if let Node::Element(e) = &*node {
     if e.tag == "script" {
-          if let Some(src) = e.attributes.get("src") {
-            scripts.push(src.clone());
-          }
+      if let Some(src) = e.attributes.get("src") {
+        scripts.push(src.clone());
+      }
     }
   }
 
