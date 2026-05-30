@@ -15,6 +15,30 @@ document = {
       return new Node(h);
     });
   },
+
+  querySelector: function (x) {
+    let handle = __rust__.querySelector(x);
+    return handle !== null ? new Node(handle) : null;
+  },
+
+  getElementById: function (id) {
+    let handle = __rust__.getElementById(id);
+    return handle !== null ? new Node(handle) : null;
+  },
+
+  getElementsByClassName: function (className) {
+    let handles = __rust__.getElementsByClassName(className);
+    return handles.map(function (h) {
+      return new Node(h);
+    });
+  },
+
+  getElementsByTagName: function (tagName) {
+    let handles = __rust__.getElementsByTagName(tagName);
+    return handles.map(function (h) {
+      return new Node(h);
+    });
+  },
 };
 
 Node.prototype.getAttribute = function (attribute) {
@@ -48,6 +72,15 @@ Node.prototype.dispatchEvent = function (event) {
 Object.defineProperty(Node.prototype, "innerHTML", {
   set: function (s) {
     __rust__.innerHTML_set(this.handle, s.toString());
+  },
+});
+
+Object.defineProperty(Node.prototype, "children", {
+  get: function () {
+    let handles = __rust__.node_children(this.handle);
+    return handles.map(function (h) {
+      return new Node(h);
+    });
   },
 });
 

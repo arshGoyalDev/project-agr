@@ -146,11 +146,10 @@ State is tab-local for DOM, layout, scroll offset, focus, title, and history. Ne
 ### JS
 
 - `console.log` for logging to stdout.
-- `document.querySelectorAll(selector)` returns a list of Node objects matching the CSS selector.
+- `document` is a global object with selectors for selecting html elements;
 - `node.getAttribute(attribute)` returns the value of the attribute on the element.
 - `node.innerHTML = htmlString` sets the inner HTML of the element (triggers relayout).
 - `new Node(handle)` is a constructor used internally by the bindings to wrap a DOM handle.
-- `document` is a global object with `querySelectorAll`.
 - `Event` constructor and `event.preventDefault()`.
 - `node.addEventListener(type, listener)` and `node.dispatchEvent(event)` for basic event handling.
 
