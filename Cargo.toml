@@ -5,6 +5,7 @@ members = [
   "crates/css-parser",
   "crates/layout",
   "crates/app",
+  "crates/js-bindings"
 ]
 resolver = "2"
 
