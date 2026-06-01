@@ -204,8 +204,15 @@ impl HTMLParser {
         let key = attrpair[..pos].to_lowercase();
         let mut value = attrpair[pos + 1..].to_string();
 
-        if value.len() > 2 && (value.starts_with('"') || value.starts_with('\'')) {
+        if value.len() >= 2
+          && ((value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\'')))
+        {
           value = value[1..value.len() - 1].to_string();
+        } else if value.starts_with('"') || value.starts_with('\'') {
+          // Malformed HTML: Only has a starting quote.
+          // Use .chars().skip(1) to safely bypass the first character regardless of byte length!
+          value = value.chars().skip(1).collect();
         }
 
         attributes.insert(key, value);

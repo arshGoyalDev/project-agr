@@ -1,4 +1,5 @@
 use iced::Task;
+use layout::layout::decode_entities;
 
 use crate::browser::Browser;
 use crate::dom::{extract_title, find_inline_styles, find_script_links, find_stylesheet_links};
@@ -31,9 +32,11 @@ pub fn html_fetched(
 
       let mut links = Vec::new();
       find_stylesheet_links(&tree, &mut links);
+      let links: Vec<String> = links.into_iter().map(|l| decode_entities(&l)).collect();
 
       let mut scripts = Vec::new();
       find_script_links(&tree, &mut scripts);
+      let scripts: Vec<String> = scripts.into_iter().map(|s| decode_entities(&s)).collect();
 
       tab.tree = Some(tree.clone());
       tab.js_runtime.set_dom_tree(tree.clone());

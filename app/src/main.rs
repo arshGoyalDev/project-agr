@@ -11,7 +11,7 @@ mod window_controls;
 use browser::Browser;
 
 fn main() -> iced::Result {
-  iced::application("project-agr", Browser::update, Browser::view)
+  iced::application("Project AGR", Browser::update, Browser::view)
     .subscription(Browser::subscription)
     .theme(Browser::theme)
     .window(iced::window::Settings {

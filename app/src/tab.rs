@@ -189,14 +189,26 @@ impl Tab {
       let is_form = {
         if let Node::Element(elt) = &*node {
           if elt.tag == "form" {
-            form_action = elt.attributes.get("action").cloned();
-            form_method = Some(
-              elt
-                .attributes
-                .get("method")
-                .cloned()
-                .unwrap_or_else(|| "GET".to_string()),
-            );
+            let method = elt
+              .attributes
+              .get("method")
+              .map(|s| s.trim().to_uppercase())
+              .unwrap_or_else(|| "GET".to_string());
+
+            let mut action = elt
+              .attributes
+              .get("action")
+              .cloned()
+              .unwrap_or_else(|| self.url.clone());
+
+            if method == "GET" && action.contains('?') {
+              if let Some((base, _)) = action.split_once('?') {
+                action = base.to_string();
+              }
+            }
+
+            form_method = Some(method);
+            form_action = Some(action);
             true
           } else {
             false

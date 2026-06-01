@@ -1,3 +1,6 @@
+
+globalThis.window = globalThis;
+
 console = {
   log: function (x) {
     __rust__.log(x);
@@ -40,6 +43,18 @@ document = {
     });
   },
 };
+
+Object.defineProperty(document, "body", {
+  get: function () {
+    return document.querySelector("body");
+  }
+});
+
+Object.defineProperty(document, "documentElement", {
+  get: function () {
+    return document.querySelector("html");
+  }
+});
 
 Node.prototype.getAttribute = function (attribute) {
   return __rust__.getAttribute(this.handle, attribute);

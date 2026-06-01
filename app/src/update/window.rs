@@ -1,12 +1,12 @@
 use iced::keyboard::Key;
 use iced::keyboard::key::Named;
-
 use iced::{Task, window};
 
 use crate::browser::Browser;
 use crate::message::Message;
 
 use html_parser::Node;
+use layout::layout::decode_entities;
 use net::URLHandler;
 
 use std::cell::RefCell;
@@ -106,6 +106,10 @@ pub fn key_pressed(browser: &mut Browser, key: Key) -> Task<Message> {
         }
         needs_relayout = true;
       }
+      Key::Named(Named::Space) => {
+        tab.keypress(' ');
+        needs_relayout = true;
+      }
       Key::Named(Named::Backspace) => {
         tab.backspace();
         needs_relayout = true;
@@ -171,11 +175,18 @@ pub fn click(browser: &mut Browser, x: f32, y: f32) -> Task<Message> {
             if let Node::Element(e) = &mut *node_borrow {
               if e.tag == "a" {
                 if let Some(href) = e.attributes.get("href") {
-                  clicked_href = Some(href.clone());
+                  clicked_href = Some(decode_entities(href));
                   clicked_a_node = Some(current_node.clone());
                 }
               } else if e.tag == "input" {
-                clicked_input = Some(current_node.clone());
+                let is_submit = e.attributes.get("type").map(|s| s.trim().to_lowercase())
+                  == Some("submit".to_string());
+
+                if is_submit {
+                  clicked_button = Some(current_node.clone());
+                } else {
+                  clicked_input = Some(current_node.clone());
+                }
               } else if e.tag == "button" {
                 clicked_button = Some(current_node.clone());
               }

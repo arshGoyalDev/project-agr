@@ -123,7 +123,9 @@ impl BlockLayout {
     drop(node);
 
     if let Some(w) = css_width {
-      self.width = w;
+      if w.is_finite() && !w.is_nan() {
+        self.width = w.clamp(0.0, 10000.0); // No infinite widths!
+      }
     }
 
     let mode = self.layout_mode();
@@ -140,7 +142,9 @@ impl BlockLayout {
       }
 
       if let Some(h) = css_height {
-        self.height = h;
+        if h.is_finite() && !h.is_nan() {
+          self.height = h.clamp(0.0, 50000.0); // No infinite heights!
+        }
       } else {
         self.height = calc_height;
       }
@@ -185,10 +189,13 @@ impl BlockLayout {
         }
       }
       Node::Element(element) => {
-        if element.tag == "script" {
+        // HIDE all invisible tags, including <noscript> and <style>!
+        if matches!(
+          element.tag.as_str(),
+          "script" | "style" | "noscript" | "head" | "meta"
+        ) {
           return;
         }
-
         // Intercept inputs and buttons and draw them immediately
         if element.tag == "input" || element.tag == "button" {
           drop(node);
@@ -233,9 +240,13 @@ impl BlockLayout {
   fn word(
     &mut self,
     node_rc: &Rc<RefCell<Node>>,
-    word: String,
+    mut word: String,
     font_cache: &mut HashMap<FontKey, Font>,
   ) {
+    if word.len() > 1000 {
+      word = word.chars().take(1000).collect::<String>() + "...";
+    }
+
     let node = node_rc.borrow();
     let style_map = node.style();
 
@@ -256,6 +267,11 @@ impl BlockLayout {
       .unwrap_or(12.0);
 
     size = size.max(1.0);
+    if size.is_nan() || !size.is_finite() {
+      size = 16.0;
+    }
+
+    size = size.clamp(1.0, 200.0);
 
     let color = style_map
       .get("color")
@@ -357,6 +373,11 @@ impl BlockLayout {
       .unwrap_or(12.0);
 
     size = size.max(1.0);
+    if size.is_nan() || !size.is_finite() {
+      size = 16.0;
+    }
+
+    size = size.clamp(1.0, 200.0);
 
     let family_str = style_map
       .get("font-family")
@@ -402,7 +423,7 @@ impl BlockLayout {
       0.0
     };
 
-    let input_width = style_map
+    let mut input_width = style_map
       .get("width")
       .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok())
       .map(|px| px * 0.75)
@@ -414,11 +435,21 @@ impl BlockLayout {
         }
       });
 
-    let input_height = style_map
+    let mut input_height = style_map
       .get("height")
       .and_then(|s| s.trim_end_matches("px").parse::<f32>().ok())
       .map(|px| px * 0.75)
       .unwrap_or_else(|| if is_checkable { size * 1.2 } else { size * 1.5 });
+
+    if !input_width.is_finite() || input_width.is_nan() {
+      input_width = INPUT_WIDTH_PX;
+    }
+    input_width = input_width.clamp(10.0, 2000.0);
+
+    if !input_height.is_finite() || input_height.is_nan() {
+      input_height = size * 1.5;
+    }
+    input_height = input_height.clamp(10.0, 2000.0);
 
     drop(node);
 

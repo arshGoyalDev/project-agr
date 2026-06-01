@@ -17,7 +17,7 @@ pub fn navigate_to(browser: &mut Browser, url: String, payload: Option<String>) 
     format!("https://{}", url)
   } else {
     let query = url.replace(' ', "+");
-    format!("https://google.com/search?q={}", query)
+    format!("https://wiby.me/?q={}", query)
   };
 
   let current_base = current_url.split('#').next().unwrap_or(&current_url);
