@@ -288,7 +288,53 @@ pub fn js_inner_html_set(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> J
   Ok(JsValue::undefined())
 }
 
+pub fn js_inner_html_get(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let handle = args.get(0).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+  let mut result = String::new();
+
+  ACTIVE_DOM.with(|dom| {
+    if let Some(state) = &*dom.borrow() {
+      if let Some(node) = state.handle_map.borrow().get(&handle) {
+        result = dom_tree_to_html_string(node);
+      }
+    }
+  });
+
+  Ok(JsValue::from(JsString::from(result)))
+}
+
 // Helpers
+fn dom_tree_to_html_string(node: &Rc<RefCell<Node>>) -> String {
+  let mut ans = String::new();
+
+  if let Node::Element(elt) = &*node.borrow() {
+    for child in &elt.children {
+      if let Node::Element(ch) = &*child.borrow() {
+        ans.push('<');
+        ans.push_str(&ch.tag);
+
+        for attr in ch.attributes.clone() {
+          ans.push_str(&format!(" {}=\"{}\"", attr.0, attr.1));
+        }
+
+        ans.push('>');
+
+        let child_str = dom_tree_to_html_string(child);
+
+        ans.push_str(&child_str);
+
+        ans.push_str("</");
+        ans.push_str(&ch.tag);
+        ans.push('>');
+      } else if let Node::Text(chl) = &*child.borrow() {
+        ans.push_str(&chl.text);
+      }
+    }
+  }
+
+  return ans;
+}
+
 fn extract_body_children(node: &Rc<RefCell<Node>>) -> Vec<Rc<RefCell<Node>>> {
   let n = node.borrow();
   if let Node::Element(e) = &*n {

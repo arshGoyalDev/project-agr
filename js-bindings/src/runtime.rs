@@ -1,7 +1,7 @@
 use crate::bindings::{
   js_get_attribute, js_get_element_by_id, js_get_elements_by_class_name,
-  js_get_elements_by_tag_name, js_inner_html_set, js_log, js_node_children, js_query_selector,
-  js_query_selector_all,
+  js_get_elements_by_tag_name, js_inner_html_get, js_inner_html_set, js_log, js_node_children,
+  js_query_selector, js_query_selector_all,
 };
 
 use boa_engine::object::ObjectInitializer;
@@ -58,6 +58,11 @@ impl JsRuntime {
       .function(
         NativeFunction::from_fn_ptr(js_inner_html_set),
         JsString::from("innerHTML_set"),
+        2,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_inner_html_get),
+        JsString::from("innerHTML_get"),
         2,
       )
       .function(

@@ -88,6 +88,9 @@ Object.defineProperty(Node.prototype, "innerHTML", {
   set: function (s) {
     __rust__.innerHTML_set(this.handle, s.toString());
   },
+  get: function (s) {
+    return __rust__.innerHTML_get(this.handle);
+  }
 });
 
 Object.defineProperty(Node.prototype, "children", {
