@@ -1,8 +1,8 @@
 globalThis.window = globalThis;
 
 console = {
-  log: function (x) {
-    __rust__.log(x);
+  log: function (...args) {
+    __rust__.log(...args);
   },
 };
 
@@ -117,6 +117,15 @@ Object.defineProperty(Node.prototype, "children", {
     });
   },
 });
+
+Object.defineProperty(Node.prototype, "textContent", {
+  set: function (s) {
+    __rust__.textContent_set(this.handle, s.toString());
+  },
+  get: function () {
+    return __rust__.textContent_get(this.handle);
+  }
+})
 
 function Event(type) {
   this.type = type;

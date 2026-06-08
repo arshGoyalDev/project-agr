@@ -8,10 +8,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub fn js_log(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
-  let msg = js_to_string(args.get(0));
+pub fn js_log(_this: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let strings: Vec<String> = args.iter().map(|val| js_to_string(Some(val))).collect();
+  let msg = strings.join(" ");
 
   println!("[JS Log] {}", msg);
+
   Ok(JsValue::undefined())
 }
 
@@ -414,7 +416,66 @@ pub fn js_insert_before(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> Js
   Ok(JsValue::undefined())
 }
 
+pub fn js_text_content_get(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let handle = args.get(0).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+  let mut result = String::new();
+
+  ACTIVE_DOM.with(|dom| {
+    if let Some(state) = &*dom.borrow() {
+      if let Some(node) = state.handle_map.borrow().get(&handle) {
+        result = text_content_string(node);
+      }
+    }
+  });
+
+  Ok(JsValue::from(JsString::from(result)))
+}
+
+pub fn js_text_content_set(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let handle = args.get(0).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+
+  let text_content = js_to_string(args.get(1));
+
+  ACTIVE_DOM.with(|dom| {
+    if let Some(state) = &*dom.borrow() {
+      if let Some(node) = state.handle_map.borrow_mut().get(&handle) {
+        if let Node::Element(e) = &mut *node.borrow_mut() {
+          let parent_weak = Rc::downgrade(node);
+          let text_node = Rc::new(RefCell::new(Node::Text(Text {
+            text: text_content,
+            children: vec![],
+            parent: Some(parent_weak),
+            style: HashMap::new(),
+          })));
+
+          e.children = vec![text_node];
+        }
+        *state.needs_relayout.borrow_mut() = true;
+      }
+    }
+  });
+
+  Ok(JsValue::undefined())
+}
+
 // Helpers
+fn text_content_string(node: &Rc<RefCell<Node>>) -> String {
+  let mut ans = String::new();
+
+  if let Node::Element(elt) = &*node.borrow() {
+    for child in &elt.children {
+      if let Node::Text(t) = &*child.borrow() {
+        ans.push_str(&t.text);
+      } else if let Node::Element(_elt) = &*child.borrow() {
+        let child_text = text_content_string(child);
+        ans.push_str(&child_text);
+      }
+    }
+  }
+
+  return ans;
+}
+
 fn dom_tree_to_html_string(node: &Rc<RefCell<Node>>) -> String {
   let mut ans = String::new();
 
