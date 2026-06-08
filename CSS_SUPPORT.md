@@ -117,6 +117,7 @@ Important limitation:
 - Parsed from `px`.
 - `%` values are resolved relative to the parent if the parent has a `px` size.
 - Layout converts pixel values to `iced` text size using a `0.75` multiplier.
+- Values are clamped to the range `[1, 200]` and any `NaN` or infinite value is reset to `16px` to prevent rendering panics.
 
 Unsupported:
 
@@ -150,6 +151,7 @@ Important limitation:
 
 - Used by block layout as an explicit element width when the value is in `px`.
 - Used by form controls to size inputs.
+- Values are clamped to the range `[0, 10000]`; `NaN` or infinite values are ignored.
 
 Limitations:
 
@@ -161,6 +163,7 @@ Limitations:
 
 - Used by block layout as an explicit element height when the value is in `px`.
 - Used by form controls to size inputs.
+- Values are clamped to the range `[0, 50000]`; `NaN` or infinite values are ignored.
 
 Limitations match `width`.
 
@@ -169,10 +172,11 @@ Limitations match `width`.
 - Partially used.
 - Child elements with `display: block` influence whether the parent chooses block layout.
 - The browser default stylesheet uses `display` to classify many tags.
+- Layout now explicitly skips the following tags regardless of CSS: `<script>`, `<style>`, `<noscript>`, `<head>`, `<meta>`.
 
 Major limitation:
 
-- The element's own `display` value does not suppress layout or paint. `display: none` is not honored as a true hidden state.
+- The element's own `display` value does not suppress layout or paint for arbitrary tags. `display: none` is not honored as a true hidden state for other elements.
 
 ### `border-color`
 
@@ -261,6 +265,7 @@ Important caveat:
 - Invalid rules recover by skipping to `}` or `;`, which is forgiving but imprecise.
 - Property names accept only alphanumeric characters plus `#-.%_` through the parser's word routine, which is broader than needed in some places and still incomplete in others.
 - Unknown values are stored as-is and fail later only when a downstream consumer tries to interpret them.
+- **Attribute value parsing fix**: The HTML parser now correctly strips both opening and closing quotes from attribute values. Previously, values with only an opening quote (malformed HTML) could carry a stray leading quote character into style application.
 
 ## Practical Support Summary
 

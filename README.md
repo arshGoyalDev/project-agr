@@ -30,7 +30,7 @@ The project is closer to a learning browser than a standards-compliant engine. I
 ### `html-parser`
 
 - `node.rs`: DOM node model.
-- `parser.rs`: token-light HTML parser with implicit tag insertion and script/comment handling.
+- `parser.rs`: token-light HTML parser with implicit tag insertion, script/comment handling, and blocking script execution support (inline, defer, async).
 
 ### `css-parser`
 
@@ -68,13 +68,14 @@ The main runtime pipeline is:
 
 1. `Browser::new` creates the first tab and dispatches `LoadUrl`.
 2. `fetch_html_task` uses `net::URLHandler` to resolve and fetch the resource.
-3. `loading::html_fetched` parses HTML into a DOM tree.
-4. Stylesheet links and inline `<style>` blocks are collected.
-5. `loading::css_fetched` loads `browser.css`, linked CSS, and inline CSS, then applies rules with `css_parser::style`.
-6. `loading::js_fetched` loads linked js, then use `JsRuntime` to execute the scripts
-6. `DocumentLayout::layout` builds layout boxes from the styled DOM.
-7. `DocumentLayout::paint` emits a `DisplayList`.
-8. `BrowserCanvas` renders the display list and handles scrolling, clicks, and typing events.
+3. `loading::html_fetched` drives the HTML parser incrementally, pausing when a `<script>` tag is encountered.
+4. Inline scripts are executed immediately; external scripts are fetched and executed before parsing resumes. Deferred/async scripts run after parsing completes.
+5. Stylesheet links and inline `<style>` blocks are collected.
+6. `loading::css_fetched` loads `browser.css`, linked CSS, and inline CSS, then applies rules with `css_parser::style`.
+7. `loading::js_fetched` loads linked JS, then uses `JsRuntime` to execute the scripts.
+8. `DocumentLayout::layout` builds layout boxes from the styled DOM.
+9. `DocumentLayout::paint` emits a `DisplayList`.
+10. `BrowserCanvas` renders the display list and handles scrolling, clicks, and typing events.
 
 State is tab-local for DOM, layout, scroll offset, focus, title, and history. Network cache is process-global through a `lazy_static` `Mutex<HashMap<...>>`.
 
@@ -145,13 +146,20 @@ State is tab-local for DOM, layout, scroll offset, focus, title, and history. Ne
 
 ### JS
 
-- `console.log` for logging to stdout.
-- `document` is a global object with selectors for selecting html elements;
-- `node.getAttribute(attribute)` returns the value of the attribute on the element.
-- `node.innerHTML = htmlString` sets the inner HTML of the element (triggers relayout).
+- `console.log(...args)`: Logs one or more values joined with spaces to stdout.
+- `document` is a global object with:
+  - Selector methods: `querySelector`, `querySelectorAll`, `getElementById`, `getElementsByClassName`, `getElementsByTagName`.
+  - Creation methods: `createElement(tagName)`, `createTextNode(text)`.
+  - Convenience getters: `document.body`, `document.documentElement`.
+- `node.getAttribute(attribute)`: returns the value of the attribute on the element.
+- `node.innerHTML`: get/set the inner HTML of an element (triggers relayout on set).
+- `node.textContent`: get/set the concatenated text content of an element (triggers relayout on set).
+- `node.appendChild(child)`: appends a child node (triggers relayout).
+- `node.insertBefore(newNode, referenceNode)`: inserts before a reference child (triggers relayout).
 - `new Node(handle)` is a constructor used internally by the bindings to wrap a DOM handle.
 - `Event` constructor and `event.preventDefault()`.
 - `node.addEventListener(type, listener)` and `node.dispatchEvent(event)` for basic event handling.
+- Blocking script loading: the HTML parser pauses on `<script>` tags, executes inline scripts immediately, fetches external scripts before resuming, and collects `defer`/`async` scripts to run after parsing.
 
 ## Current Behavior by Crate
 ### `net`
@@ -160,7 +168,7 @@ State is tab-local for DOM, layout, scroll offset, focus, title, and history. Ne
 
 ### `html-parser`
 
-The parser is a character scanner, not a tokenizer. It tracks three booleans: inside tag, inside comment, and inside script. Parsed nodes are stored as `Rc<RefCell<Node>>` with parent `Weak` references.
+The parser is a character scanner, not a tokenizer. It tracks three booleans: inside tag, inside comment, and inside script. When a `<script>` tag is encountered the parser yields a `ParseYield` signal instead of continuing, allowing the caller to handle script execution (inline or fetched) before resuming. Parsed nodes are stored as `Rc<RefCell<Node>>` with parent `Weak` references. The `node.rs` module now exposes a `set_parent` helper used by the JS bindings when attaching newly created nodes to the tree.
 
 ### `css-parser`
 
@@ -170,7 +178,7 @@ See [CSS_SUPPORT.md](/home/arshgoyal/Engineer/Developer/Rust/projects/project-ag
 
 ### `layout`
 
-`DocumentLayout` wraps a single `BlockLayout` rooted at the parsed DOM. `BlockLayout` decides block vs inline by looking at styled child display values and a few hard-coded tags (`input`, `button`). Painting outputs `Text`, `Rect`, and `Circle` commands.
+`DocumentLayout` wraps a single `BlockLayout` rooted at the parsed DOM. `BlockLayout` decides block vs inline by looking at styled child display values and a few hard-coded tags (`input`, `button`). The layout engine now clamps `font-size`, `width`, and `height` to finite, sane ranges to avoid rendering panics from malformed CSS values. Words longer than 1000 characters are truncated with an ellipsis. Invisible tags (`<script>`, `<style>`, `<noscript>`, `<head>`, `<meta>`) are skipped entirely during layout. Painting outputs `Text`, `Rect`, and `Circle` commands.
 
 ### `app`
 
