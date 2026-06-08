@@ -58,4 +58,11 @@ impl Node {
       Node::Text(t) => &mut t.style,
     }
   }
+
+  pub fn set_parent(&mut self, p: Weak<RefCell<Node>>) {
+    match self {
+      Node::Element(e) => e.parent = Some(p),
+      Node::Text(t) => t.parent = Some(p),
+    }
+  }
 }

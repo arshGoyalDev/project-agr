@@ -1,7 +1,7 @@
 use crate::bindings::{
-  js_get_attribute, js_get_element_by_id, js_get_elements_by_class_name,
-  js_get_elements_by_tag_name, js_inner_html_get, js_inner_html_set, js_log, js_node_children,
-  js_query_selector, js_query_selector_all,
+  js_append_child, js_create_element, js_create_text_node, js_get_attribute, js_get_element_by_id,
+  js_get_elements_by_class_name, js_get_elements_by_tag_name, js_inner_html_get, js_inner_html_set,
+  js_insert_before, js_log, js_node_children, js_query_selector, js_query_selector_all,
 };
 
 use boa_engine::object::ObjectInitializer;
@@ -84,6 +84,26 @@ impl JsRuntime {
         NativeFunction::from_fn_ptr(js_get_elements_by_tag_name),
         JsString::from("getElementsByTagName"),
         1,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_create_element),
+        JsString::from("createElement"),
+        1,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_create_text_node),
+        JsString::from("createTextNode"),
+        1,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_append_child),
+        JsString::from("appendChild"),
+        2,
+      )
+      .function(
+        NativeFunction::from_fn_ptr(js_insert_before),
+        JsString::from("insertBefore"),
+        3,
       )
       .build();
 

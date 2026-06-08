@@ -2,9 +2,10 @@ use crate::runtime::ACTIVE_DOM;
 
 use boa_engine::{Context, JsResult, JsString, JsValue};
 use html_parser::parser::ParseYield;
-use html_parser::{HTMLParser, Node};
+use html_parser::{Element, HTMLParser, Node, Text};
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn js_log(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
@@ -310,6 +311,107 @@ pub fn js_inner_html_get(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> J
   });
 
   Ok(JsValue::from(JsString::from(result)))
+}
+
+pub fn js_create_element(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let tag = js_to_string(args.get(0));
+  let new_node = Rc::new(RefCell::new(Node::Element(Element {
+    tag,
+    self_closing: false,
+    children: vec![],
+    attributes: HashMap::new(),
+    parent: None,
+    style: HashMap::new(),
+  })));
+
+  ACTIVE_DOM.with(|dom| {
+    if let Some(state) = &*dom.borrow() {
+      let mut map = state.handle_map.borrow_mut();
+      let mut next = state.next_handle.borrow_mut();
+      let h = *next;
+      *next += 1;
+      map.insert(h, new_node);
+      return Ok(JsValue::from(h));
+    }
+    Ok(JsValue::null())
+  })
+}
+
+pub fn js_create_text_node(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let text = js_to_string(args.get(0));
+  let new_node = Rc::new(RefCell::new(Node::Text(Text {
+    text,
+    children: vec![],
+    parent: None,
+    style: HashMap::new(),
+  })));
+
+  ACTIVE_DOM.with(|dom| {
+    if let Some(state) = &*dom.borrow() {
+      let mut map = state.handle_map.borrow_mut();
+      let mut next = state.next_handle.borrow_mut();
+      let h = *next;
+      *next += 1;
+      map.insert(h, new_node);
+      return Ok(JsValue::from(h));
+    }
+    Ok(JsValue::null())
+  })
+}
+
+pub fn js_append_child(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let parent_h = args.get(0).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+  let child_h = args.get(1).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+
+  ACTIVE_DOM.with(|dom| {
+    if let Some(state) = &*dom.borrow() {
+      let map = state.handle_map.borrow();
+      if let (Some(parent), Some(child)) = (map.get(&parent_h), map.get(&child_h)) {
+        parent.borrow_mut().children_mut().push(child.clone());
+        child.borrow_mut().set_parent(Rc::downgrade(parent));
+        *state.needs_relayout.borrow_mut() = true;
+      }
+    }
+  });
+  Ok(JsValue::undefined())
+}
+
+pub fn js_insert_before(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let parent_h = args.get(0).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+  let new_h = args.get(1).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+  let ref_h = args.get(2).and_then(|v| v.as_number().map(|n| n as usize)); // Can be null/None
+
+  ACTIVE_DOM.with(|dom| {
+    if let Some(state) = &*dom.borrow() {
+      let map = state.handle_map.borrow();
+      if let (Some(parent), Some(new_node)) = (map.get(&parent_h), map.get(&new_h)) {
+        let mut parent_borrow = parent.borrow_mut();
+
+        let index = if let Some(ref_h) = ref_h {
+          if let Some(ref_node) = map.get(&ref_h) {
+            parent_borrow
+              .children_mut()
+              .iter()
+              .position(|c| Rc::ptr_eq(c, ref_node))
+          } else {
+            None
+          }
+        } else {
+          None
+        };
+
+        if let Some(idx) = index {
+          parent_borrow.children_mut().insert(idx, new_node.clone());
+        } else {
+          parent_borrow.children_mut().push(new_node.clone());
+        }
+
+        new_node.borrow_mut().set_parent(Rc::downgrade(parent));
+        *state.needs_relayout.borrow_mut() = true;
+      }
+    }
+  });
+  Ok(JsValue::undefined())
 }
 
 // Helpers

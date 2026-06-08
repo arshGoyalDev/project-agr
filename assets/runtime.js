@@ -1,4 +1,3 @@
-
 globalThis.window = globalThis;
 
 console = {
@@ -42,22 +41,39 @@ document = {
       return new Node(h);
     });
   },
+
+  createElement: function (tag) {
+    return new Node(__rust__.createElement(tag));
+  },
+
+  createTextNode: function (text) {
+    return new Node(__rust__.createTextNode(text));
+  },
 };
 
 Object.defineProperty(document, "body", {
   get: function () {
     return document.querySelector("body");
-  }
+  },
 });
 
 Object.defineProperty(document, "documentElement", {
   get: function () {
     return document.querySelector("html");
-  }
+  },
 });
 
 Node.prototype.getAttribute = function (attribute) {
   return __rust__.getAttribute(this.handle, attribute);
+};
+
+Node.prototype.appendChild = function (child) {
+  __rust__.appendChild(this.handle, child.handle);
+};
+
+Node.prototype.insertBefore = function(newNode, referenceNode) {
+  let refHandle = (referenceNode && referenceNode.handle) || null;
+  __rust__.insertBefore(this.handle, newNode.handle, refHandle);
 };
 
 let LISTENERS = {};
@@ -90,7 +106,7 @@ Object.defineProperty(Node.prototype, "innerHTML", {
   },
   get: function (s) {
     return __rust__.innerHTML_get(this.handle);
-  }
+  },
 });
 
 Object.defineProperty(Node.prototype, "children", {
