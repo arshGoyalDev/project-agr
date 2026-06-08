@@ -46,22 +46,6 @@ pub fn find_inline_styles(node_rc: &Rc<RefCell<Node>>, inline_rules: &mut Vec<St
   }
 }
 
-pub fn find_script_links(node_rc: &Rc<RefCell<Node>>, scripts: &mut Vec<String>) {
-  let node = node_rc.borrow();
-
-  if let Node::Element(e) = &*node {
-    if e.tag == "script" {
-      if let Some(src) = e.attributes.get("src") {
-        scripts.push(src.clone());
-      }
-    }
-  }
-
-  for child in node.children() {
-    find_script_links(child, scripts);
-  }
-}
-
 /// Returns the trimmed text content of the first `<title>` element found, if any.
 pub fn extract_title(node_rc: &Rc<RefCell<Node>>) -> Option<String> {
   let node = node_rc.borrow();

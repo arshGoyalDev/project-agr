@@ -1,75 +1,155 @@
 use iced::Task;
 use layout::layout::decode_entities;
+use net::URLHandler;
 
 use crate::browser::Browser;
-use crate::dom::{extract_title, find_inline_styles, find_script_links, find_stylesheet_links};
+use crate::dom::{extract_title, find_inline_styles, find_stylesheet_links};
 use crate::message::Message;
 use crate::net::{fetch_css_task, fetch_js_task};
 
 use css_parser::CSSParser;
 use css_parser::style;
-use html_parser::HTMLParser;
+use html_parser::{HTMLParser, ParseYield};
 use layout::{DocumentLayout, syntax_highlight};
 
 pub fn html_fetched(
   browser: &mut Browser,
   tab_index: usize,
-  base_url: String,
+  _base_url: String, // Kept to avoid unused warnings
   is_view_source: bool,
   result: Result<String, String>,
-  reload: bool,
-  hard_reload: bool,
+  _reload: bool,
+  _hard_reload: bool,
 ) -> Task<Message> {
   if let Some(tab) = browser.tabs.get_mut(tab_index) {
     if let Ok(body) = result {
-      let mut html_parser = HTMLParser::new(body);
-      let mut tree = html_parser.parse();
-
       if is_view_source {
+        // View-Source parses all at once ignoring scripts
+        let mut parser = HTMLParser::new(body);
+        let tree = loop {
+          match parser.resume() {
+            ParseYield::Finished(t) => break t,
+            _ => continue,
+          }
+        };
+
         let highlighted = syntax_highlight(&tree);
-        tree = HTMLParser::new(highlighted).parse();
+        let mut hl_parser = HTMLParser::new(highlighted);
+        let final_tree = loop {
+          match hl_parser.resume() {
+            ParseYield::Finished(t) => break t,
+            _ => continue,
+          }
+        };
+
+        tab.tree = Some(final_tree.clone());
+        return Task::done(Message::CssFetched(tab_index, vec![]));
+      } else {
+        // Normal Load: Start the Resumable Parser!
+        let parser = HTMLParser::new(body);
+        tab.parser = Some(parser);
+        return Task::done(Message::ResumeParsing(tab_index, None));
       }
-
-      let mut links = Vec::new();
-      find_stylesheet_links(&tree, &mut links);
-      let links: Vec<String> = links.into_iter().map(|l| decode_entities(&l)).collect();
-
-      let mut scripts = Vec::new();
-      find_script_links(&tree, &mut scripts);
-      let scripts: Vec<String> = scripts.into_iter().map(|s| decode_entities(&s)).collect();
-
-      tab.tree = Some(tree.clone());
-      tab.js_runtime.set_dom_tree(tree.clone());
-
-      // Create the CSS Fetching Task
-      let css_task = if links.is_empty() {
-        Task::done(Message::CssFetched(tab_index, vec![]))
-      } else {
-        Task::perform(
-          fetch_css_task(links, base_url.clone(), reload, hard_reload),
-          move |bodies| Message::CssFetched(tab_index, bodies),
-        )
-      };
-
-      // Create the JS Fetching Task
-      let js_task = if scripts.is_empty() {
-        Task::done(Message::JsFetched(tab_index, vec![]))
-      } else {
-        Task::perform(
-          fetch_js_task(scripts, base_url.clone(), reload, hard_reload),
-          move |bodies| Message::JsFetched(tab_index, bodies),
-        )
-      };
-
-      // Run both tasks concurrently and return them
-      return Task::batch(vec![css_task, js_task]);
     } else {
       tab.title = String::from("Network Error");
     }
   }
-
   Task::none()
 }
+
+pub fn resume_parsing(
+  browser: &mut Browser,
+  tab_index: usize,
+  script_body: Option<String>,
+) -> Task<Message> {
+  if let Some(tab) = browser.tabs.get_mut(tab_index) {
+    // 1. INJECT AND RUN EXTERNAL SCRIPTS
+    if let Some(code) = script_body {
+      if let Some(parser) = &tab.parser {
+        // We must give Boa the partial DOM tree before it can run!
+        if let Some(root) = parser.document() {
+          tab.js_runtime.set_dom_tree(root);
+        }
+      }
+      tab.js_runtime.run(&code);
+    }
+
+    let mut parser = if let Some(p) = tab.parser.take() {
+      p
+    } else {
+      return Task::none();
+    };
+
+    loop {
+      match parser.resume() {
+        ParseYield::Finished(tree) => {
+          tab.tree = Some(tree.clone());
+          tab.js_runtime.set_dom_tree(tree.clone());
+
+          let mut links = Vec::new();
+          find_stylesheet_links(&tree, &mut links);
+          let links: Vec<String> = links.into_iter().map(|l| decode_entities(&l)).collect();
+
+          // Fetch any scripts that had the `defer` attribute
+          let scripts = parser.deferred_scripts.clone();
+          let base_url = tab.url.clone();
+
+          let css_task = if links.is_empty() {
+            Task::done(Message::CssFetched(tab_index, vec![]))
+          } else {
+            Task::perform(
+              fetch_css_task(links, base_url.clone(), false, false),
+              move |bodies| Message::CssFetched(tab_index, bodies),
+            )
+          };
+
+          let js_task = if scripts.is_empty() {
+            Task::done(Message::JsFetched(tab_index, vec![]))
+          } else {
+            Task::perform(
+              fetch_js_task(scripts, base_url.clone(), false, false),
+              move |bodies| Message::JsFetched(tab_index, bodies),
+            )
+          };
+
+          return Task::batch(vec![css_task, js_task]);
+        }
+        ParseYield::InlineScript { code } => {
+          // 2. INJECT AND RUN INLINE SCRIPTS
+          // We must give Boa the partial DOM tree before it can run!
+          if let Some(root) = parser.document() {
+            tab.js_runtime.set_dom_tree(root);
+          }
+          tab.js_runtime.run(&code);
+        }
+        ParseYield::ExternalScript { src } => {
+          let url = decode_entities(&src);
+          let base_url = tab.url.clone();
+
+          let mut url_handler = URLHandler::default();
+          url_handler.init(base_url.clone(), false);
+          let resolved_url = url_handler.resolve(&url);
+
+          tab.parser = Some(parser);
+
+          return Task::perform(
+            fetch_js_task(vec![resolved_url], base_url, false, false),
+            move |mut bodies| {
+              let script_code = if !bodies.is_empty() {
+                Some(bodies.remove(0))
+              } else {
+                None
+              };
+              Message::ResumeParsing(tab_index, script_code)
+            },
+          );
+        }
+      }
+    }
+  }
+  Task::none()
+}
+
 pub fn css_fetched(
   browser: &mut Browser,
   tab_index: usize,
@@ -122,6 +202,7 @@ pub fn css_fetched(
   Task::none()
 }
 
+// handles deffered scripts at completion of html parsing
 pub fn js_fetched(
   browser: &mut Browser,
   tab_index: usize,

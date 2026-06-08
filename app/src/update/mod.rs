@@ -45,6 +45,7 @@ impl Browser {
       Message::Reload(tab_index, url, payload, hard_reload) => {
         navigation::reload(self, tab_index, url, payload, hard_reload)
       }
+      Message::ResumeParsing(tab_index, script) => loading::resume_parsing(self, tab_index, script),
       Message::HtmlFetched(tab_index, base, is_view_source, res, reload, hard_reload) => {
         loading::html_fetched(
           self,

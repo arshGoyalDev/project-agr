@@ -1,4 +1,4 @@
-use html_parser::Node;
+use html_parser::{HTMLParser, Node};
 use js_bindings::JsRuntime;
 use layout::{DisplayList, DocumentLayout};
 
@@ -23,6 +23,7 @@ pub struct Tab {
   pub title: String,
   pub focus: Option<Rc<RefCell<Node>>>,
   pub js_runtime: JsRuntime,
+  pub parser: Option<HTMLParser>,
 }
 
 impl Tab {
@@ -42,6 +43,7 @@ impl Tab {
       title: String::new(),
       focus: None,
       js_runtime: JsRuntime::new(),
+      parser: None,
     }
   }
 
