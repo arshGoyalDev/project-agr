@@ -99,12 +99,16 @@ impl JsRuntime {
   }
 
   pub fn set_dom_tree(&mut self, tree: Rc<RefCell<Node>>) {
-    self.state = Some(DomState {
-      tree,
-      handle_map: Rc::new(RefCell::new(HashMap::new())),
-      next_handle: Rc::new(RefCell::new(0)),
-      needs_relayout: Rc::new(RefCell::new(false)),
-    });
+    if let Some(state) = &mut self.state {
+      state.tree = tree;
+    } else {
+      self.state = Some(DomState {
+        tree,
+        handle_map: Rc::new(RefCell::new(HashMap::new())),
+        next_handle: Rc::new(RefCell::new(0)),
+        needs_relayout: Rc::new(RefCell::new(false)),
+      });
+    }
   }
 
   pub fn run(&mut self, code: &str) -> bool {

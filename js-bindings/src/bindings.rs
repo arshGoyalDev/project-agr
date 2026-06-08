@@ -1,6 +1,7 @@
 use crate::runtime::ACTIVE_DOM;
 
 use boa_engine::{Context, JsResult, JsString, JsValue};
+use html_parser::parser::ParseYield;
 use html_parser::{HTMLParser, Node};
 
 use std::cell::RefCell;
@@ -59,20 +60,22 @@ pub fn js_query_selector(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> J
       let mut results = Vec::new();
       find_nodes(&state.tree, &selector, &mut results);
 
-      let node = results[0].clone();
+      if !results.is_empty() {
+        let node = results[0].clone();
 
-      let mut map = state.handle_map.borrow_mut();
-      let mut next = state.next_handle.borrow_mut();
+        let mut map = state.handle_map.borrow_mut();
+        let mut next = state.next_handle.borrow_mut();
 
-      let node_handle = if let Some((&h, _)) = map.iter().find(|(_, n)| Rc::ptr_eq(n, &node)) {
-        h
-      } else {
-        let h = *next;
-        *next += 1;
-        map.insert(h, node);
-        h
-      };
-      handle = Some(node_handle);
+        let node_handle = if let Some((&h, _)) = map.iter().find(|(_, n)| Rc::ptr_eq(n, &node)) {
+          h
+        } else {
+          let h = *next;
+          *next += 1;
+          map.insert(h, node);
+          h
+        };
+        handle = Some(node_handle);
+      }
     }
   });
 
@@ -266,7 +269,13 @@ pub fn js_inner_html_set(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> J
       if let Some(node) = state.handle_map.borrow().get(&handle) {
         let full_html = format!("<html><body>{}</body></html>", html);
         let mut parser = HTMLParser::new(full_html);
-        let new_doc = parser.parse();
+
+        let new_doc = loop {
+          match parser.resume() {
+            ParseYield::Finished(tree) => break tree,
+            _ => continue,
+          }
+        };
 
         let new_children = extract_body_children(&new_doc);
 
@@ -313,19 +322,23 @@ fn dom_tree_to_html_string(node: &Rc<RefCell<Node>>) -> String {
         ans.push('<');
         ans.push_str(&ch.tag);
 
-        for attr in ch.attributes.clone() {
-          ans.push_str(&format!(" {}=\"{}\"", attr.0, attr.1));
+        for (key, value) in &ch.attributes {
+          ans.push_str(&format!(" {}=\"{}\"", key, value));
         }
 
-        ans.push('>');
+        if ch.self_closing {
+          ans.push_str("/>");
+        } else {
+          ans.push('>');
 
-        let child_str = dom_tree_to_html_string(child);
+          let child_str = dom_tree_to_html_string(child);
 
-        ans.push_str(&child_str);
+          ans.push_str(&child_str);
 
-        ans.push_str("</");
-        ans.push_str(&ch.tag);
-        ans.push('>');
+          ans.push_str("</");
+          ans.push_str(&ch.tag);
+          ans.push('>');
+        }
       } else if let Node::Text(chl) = &*child.borrow() {
         ans.push_str(&chl.text);
       }
