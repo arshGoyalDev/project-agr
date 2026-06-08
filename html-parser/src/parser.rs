@@ -13,103 +13,155 @@ const HEAD_TAGS: [&str; 9] = [
   "base", "basefont", "bgsound", "noscript", "link", "meta", "title", "style", "script",
 ];
 
+pub enum ParseYield {
+  Finished(Rc<RefCell<Node>>),
+  InlineScript { code: String },
+  ExternalScript { src: String },
+}
+
 pub struct HTMLParser {
-  body: String,
+  chars: Vec<char>,
+  pub pos: usize,
   unfinished: Vec<Rc<RefCell<Node>>>,
   head_closed: bool,
+  pub deferred_scripts: Vec<String>,
+  text: String,
+  in_tag: bool,
+  in_comment: bool,
+  in_script: bool,
 }
 
 impl HTMLParser {
   pub fn new(body: String) -> Self {
     HTMLParser {
-      body,
+      chars: body.chars().collect(),
+      pos: 0,
       unfinished: vec![],
       head_closed: false,
+      deferred_scripts: vec![],
+      text: String::new(),
+      in_tag: false,
+      in_comment: false,
+      in_script: false,
     }
   }
 
-  pub fn parse(&mut self) -> Rc<RefCell<Node>> {
-    let body = self.body.clone();
-    let mut text = String::new();
-    let mut in_tag = false;
-    let mut in_comment = false;
-    let mut in_script = false;
-
-    let chars: Vec<char> = body.chars().collect();
-    let mut i = 0;
-
-    while i < chars.len() {
-      if in_comment {
-        if chars[i] == '-' && chars.get(i + 1) == Some(&'-') && chars.get(i + 2) == Some(&'>') {
-          in_comment = false;
-          i += 3;
+  pub fn resume(&mut self) -> ParseYield {
+    while self.pos < self.chars.len() {
+      if self.in_comment {
+        if self.chars[self.pos] == '-'
+          && self.chars.get(self.pos + 1) == Some(&'-')
+          && self.chars.get(self.pos + 2) == Some(&'>')
+        {
+          self.in_comment = false;
+          self.pos += 3;
         } else {
-          i += 1;
+          self.pos += 1;
         }
-      } else if in_script {
+      } else if self.in_script {
         let close_tag = "</script>";
-        let remaining_len = chars.len() - i;
+        let remaining_len = self.chars.len() - self.pos;
 
         if remaining_len >= close_tag.len() {
-          let slice: String = chars[i..i + close_tag.len()].iter().collect();
+          let slice: String = self.chars[self.pos..self.pos + close_tag.len()]
+            .iter()
+            .collect();
 
           if slice.to_lowercase() == close_tag {
-            if !text.is_empty() {
-              self.add_text(text.clone());
-              text.clear();
+            if !self.text.is_empty() {
+              self.add_text(self.text.clone());
+              self.text.clear();
             }
+
+            let mut is_async = false;
+            let mut is_defer = false;
+            let mut src = None;
+            let mut code = String::new();
+
+            {
+              let script_node = self.unfinished.last().unwrap().clone();
+              let borrow = script_node.borrow();
+              if let Node::Element(e) = &*borrow {
+                is_async = e.attributes.contains_key("async");
+                is_defer = e.attributes.contains_key("defer");
+                src = e.attributes.get("src").cloned();
+
+                for child_rc in &e.children {
+                  if let Node::Text(t) = &*child_rc.borrow() {
+                    code.push_str(&t.text);
+                  }
+                }
+              }
+            }
+
             self.add_tag("/script".to_string());
-            in_script = false;
-            i += close_tag.len();
+            self.in_script = false;
+            self.pos += close_tag.len();
+
+            if let Some(url) = src {
+              if !is_async && !is_defer {
+                return ParseYield::ExternalScript { src: url };
+              } else if is_defer {
+                self.deferred_scripts.push(url);
+              }
+            } else {
+              return ParseYield::InlineScript { code };
+            }
             continue;
           }
         }
 
-        text.push(chars[i]);
-        i += 1;
-      } else if !in_tag && chars[i] == '<' {
-        if chars.get(i + 1) == Some(&'!')
-          && chars.get(i + 2) == Some(&'-')
-          && chars.get(i + 3) == Some(&'-')
+        self.text.push(self.chars[self.pos]);
+        self.pos += 1;
+      } else if !self.in_tag && self.chars[self.pos] == '<' {
+        if self.chars.get(self.pos + 1) == Some(&'!')
+          && self.chars.get(self.pos + 2) == Some(&'-')
+          && self.chars.get(self.pos + 3) == Some(&'-')
         {
-          if !text.is_empty() {
-            self.add_text(text.clone());
-            text.clear();
+          if !self.text.is_empty() {
+            self.add_text(self.text.clone());
+            self.text.clear();
           }
-          in_comment = true;
-          i += 4;
+          self.in_comment = true;
+          self.pos += 4;
         } else {
-          in_tag = true;
-          if !text.is_empty() {
-            self.add_text(text.clone());
+          self.in_tag = true;
+          if !self.text.is_empty() {
+            self.add_text(self.text.clone());
           }
-          text.clear();
-          i += 1;
+          self.text.clear();
+          self.pos += 1;
         }
-      } else if in_tag && chars[i] == '>' {
-        in_tag = false;
-        let tag_content = text.clone();
-        text.clear();
+      } else if self.in_tag && self.chars[self.pos] == '>' {
+        self.in_tag = false;
+        let tag_content = self.text.clone();
+        self.text.clear();
 
         self.add_tag(tag_content.clone());
 
         let trimmed = tag_content.trim().to_lowercase();
         if trimmed == "script" || trimmed.starts_with("script ") {
-          in_script = true;
+          self.in_script = true;
         }
 
-        i += 1;
+        self.pos += 1;
       } else {
-        text.push(chars[i]);
-        i += 1;
+        self.text.push(self.chars[self.pos]);
+        self.pos += 1;
       }
     }
 
-    if !in_tag && !text.is_empty() {
-      self.add_text(text);
+    if !self.in_tag && !self.text.is_empty() {
+      let t = self.text.clone();
+      self.add_text(t);
+      self.text.clear();
     }
 
-    self.finish()
+    ParseYield::Finished(self.finish())
+  }
+
+  pub fn document(&self) -> Option<Rc<RefCell<Node>>> {
+    self.unfinished.first().cloned()
   }
 
   fn add_text(&mut self, text: String) {
@@ -158,15 +210,16 @@ impl HTMLParser {
         return;
       }
 
-      let node = self.unfinished.pop().unwrap();
-      let parent_rc = self.unfinished.last().unwrap().clone();
-      parent_rc.borrow_mut().children_mut().push(node);
+      self.unfinished.pop().unwrap();
+      // let parent_rc = self.unfinished.last().unwrap().clone();
+      // parent_rc.borrow_mut().children_mut().push(node);
     } else if SELF_CLOSING_TAGS.contains(&tag.as_str()) {
       let parent_rc = self.unfinished.last().unwrap().clone();
       let parent_weak = Rc::downgrade(&parent_rc);
 
       let node = Rc::new(RefCell::new(Node::Element(Element {
         tag,
+        self_closing: true,
         attributes,
         parent: Some(parent_weak),
         children: vec![],
@@ -179,11 +232,16 @@ impl HTMLParser {
 
       let node = Rc::new(RefCell::new(Node::Element(Element {
         tag,
+        self_closing: false,
         attributes,
         parent: parent_weak,
         children: vec![],
         style: HashMap::new(),
       })));
+
+      if let Some(parent) = self.unfinished.last() {
+        parent.borrow_mut().children_mut().push(node.clone());
+      }
 
       self.unfinished.push(node);
     }
@@ -210,8 +268,6 @@ impl HTMLParser {
         {
           value = value[1..value.len() - 1].to_string();
         } else if value.starts_with('"') || value.starts_with('\'') {
-          // Malformed HTML: Only has a starting quote.
-          // Use .chars().skip(1) to safely bypass the first character regardless of byte length!
           value = value.chars().skip(1).collect();
         }
 
@@ -230,9 +286,9 @@ impl HTMLParser {
     }
 
     while self.unfinished.len() > 1 {
-      let node = self.unfinished.pop().unwrap();
-      let parent_rc = self.unfinished.last().unwrap().clone();
-      parent_rc.borrow_mut().children_mut().push(node);
+      self.unfinished.pop().unwrap();
+      // let parent_rc = self.unfinished.last().unwrap().clone();
+      // parent_rc.borrow_mut().children_mut().push(node);
     }
 
     self.unfinished.pop().unwrap()

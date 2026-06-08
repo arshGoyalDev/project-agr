@@ -16,6 +16,7 @@ pub struct Text {
 
 pub struct Element {
   pub tag: String,
+  pub self_closing: bool,
   pub children: Vec<Rc<RefCell<Node>>>,
   pub attributes: HashMap<String, String>,
   pub parent: Option<Weak<RefCell<Node>>>,
