@@ -458,6 +458,44 @@ pub fn js_text_content_set(_: &JsValue, args: &[JsValue], _ctx: &mut Context) ->
   Ok(JsValue::undefined())
 }
 
+pub fn js_remove_child(_: &JsValue, args: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+  let parent_h = args.get(0).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+  let child_h = args.get(1).and_then(|v| v.as_number()).unwrap_or(0.0) as usize;
+
+  let mut created_handle: Option<usize> = None;
+  let mut removed: Option<Rc<RefCell<Node>>> = None;
+
+  ACTIVE_DOM.with(|dom| {
+    if let Some(state) = &*dom.borrow() {
+      let mut map = state.handle_map.borrow_mut();
+
+      if let (Some(parent), Some(child)) = (map.get(&parent_h), map.get(&child_h)) {
+        let mut parent_borrow = parent.borrow_mut();
+        let children = parent_borrow.children_mut();
+
+        if let Some(index) = children.iter().position(|ch| Rc::ptr_eq(ch, child)) {
+          removed = Some(children.remove(index));
+        }
+
+        *state.needs_relayout.borrow_mut() = true;
+      }
+
+      if let Some(removed_child) = removed {
+        let mut next = state.next_handle.borrow_mut();
+        let h = *next;
+        *next += 1;
+        map.insert(h, removed_child);
+        created_handle = Some(h);
+      }
+    }
+  });
+
+  match created_handle {
+    Some(h) => Ok(JsValue::from(h)),
+    None => Ok(JsValue::null()),
+  }
+}
+
 // Helpers
 fn text_content_string(node: &Rc<RefCell<Node>>) -> String {
   let mut ans = String::new();

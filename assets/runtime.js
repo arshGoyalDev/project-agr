@@ -67,6 +67,10 @@ Node.prototype.getAttribute = function (attribute) {
   return __rust__.getAttribute(this.handle, attribute);
 };
 
+Node.prototype.removeChild = function (child) {
+  return __rust__.removeChild(this.handle, child.handle);
+}
+
 Node.prototype.appendChild = function (child) {
   __rust__.appendChild(this.handle, child.handle);
 };
