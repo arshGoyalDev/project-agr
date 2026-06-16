@@ -155,6 +155,7 @@ State is tab-local for DOM, layout, scroll offset, focus, title, and history. Ne
 - `node.innerHTML`: get/set the inner HTML of an element (triggers relayout on set).
 - `node.textContent`: get/set the concatenated text content of an element (triggers relayout on set).
 - `node.appendChild(child)`: appends a child node (triggers relayout).
+- `node.removeChild(child)`: removes a child node (triggers relayout).
 - `node.insertBefore(newNode, referenceNode)`: inserts before a reference child (triggers relayout).
 - `new Node(handle)` is a constructor used internally by the bindings to wrap a DOM handle.
 - `Event` constructor and `event.preventDefault()`.

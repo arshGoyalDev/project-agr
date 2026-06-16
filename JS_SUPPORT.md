@@ -47,6 +47,7 @@ The JS runtime is initialized per tab and includes:
   - Getter: Returns the concatenated text content of all descendant text nodes.
   - Setter: Replaces the node's children with a single text node containing the given string. Triggers a relayout.
 - `node.appendChild(child)`: Appends `child` as the last child of the node. Sets the child's parent pointer and triggers a relayout.
+- `node.removeChild(child)`: Removes `child` from the node. Returns the removed child and triggers a relayout.
 - `node.insertBefore(newNode, referenceNode)`: Inserts `newNode` before `referenceNode` in the node's children list. If `referenceNode` is `null` or not found, `newNode` is appended. Triggers a relayout.
 - `node.addEventListener(eventType, listener)`: Registers an event listener for the given event type on the node.
 - `node.dispatchEvent(event)`: Dispatches an event to the node, triggering any registered listeners for that event type. Returns a boolean indicating if the default behavior should be prevented.
@@ -72,6 +73,7 @@ The JS runtime is initialized per tab and includes:
   - `__rust__.createElement(tagName)`: Implements `document.createElement`; returns a handle.
   - `__rust__.createTextNode(text)`: Implements `document.createTextNode`; returns a handle.
   - `__rust__.appendChild(parentHandle, childHandle)`: Implements `Node.prototype.appendChild`.
+  - `__rust__.removedChild(parentHandle, childHandle)`: Implements `Node.prototype.removeChild`.
   - `__rust__.insertBefore(parentHandle, newHandle, refHandle)`: Implements `Node.prototype.insertBefore`.
   - `__rust__.textContent_get(handle)`: Implements `Node.prototype.textContent` getter.
   - `__rust__.textContent_set(handle, text)`: Implements `Node.prototype.textContent` setter.
@@ -158,6 +160,12 @@ newDiv.appendChild(textNode);
 if (body) {
   body.appendChild(newDiv);
 }
+
+// Remove and return a child
+let parent = document.querySelector("#parent");
+let child = document.querySelector("#child");
+
+let removedChild = newDiv.removedChild(child);
 
 // Insert a node before an existing child
 if (mainContainer && mainContainer.children.length > 0) {
